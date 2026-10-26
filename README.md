@@ -61,6 +61,26 @@ Certificate IDs follow the business plan: `TITLE_NUMBER/EDITION_CITY-ST_MM.DD.YY
 - Photos people post are saved in `storage/uploads/` (not in git), or wherever `UPLOAD_DIR`
   points, and served by `/media/[name]`.
 
+## Staging
+
+https://heartovermoney.skylanex.com runs from a checkout in `/var/www/heartovermoney` on the
+phansora.com server: the app and its own Postgres in Docker (`docker-compose.prod.yml`),
+behind nginx (`/etc/nginx/conf.d/heartovermoney.skylanex.com.conf`, proxying to port 3100).
+Docker restarts both after a reboot. Settings are in `.env` beside the compose file on the
+server, including `SEED_PASSWORD`, the demo accounts' password there.
+
+To release the latest `master`:
+
+```bash
+ssh root@phansora.com 'cd /var/www/heartovermoney && git pull && docker compose -f docker-compose.prod.yml up -d --build && docker image prune -f'
+```
+
+Migrations run when the app starts. To reset the demo data on staging (this wipes it):
+
+```bash
+ssh root@phansora.com 'cd /var/www/heartovermoney && docker compose -f docker-compose.prod.yml run --rm app npx tsx scripts/seed.ts'
+```
+
 ## Checks
 
 ```bash

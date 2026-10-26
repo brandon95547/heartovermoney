@@ -3,7 +3,8 @@
 //
 //   npm run db:seed
 //
-// Demo accounts (local development only), all with the password `heart-over-money`:
+// Demo accounts, all with the password `heart-over-money` locally. On staging, SEED_PASSWORD
+// (in the server's .env) replaces it, so the public site doesn't use the one written here:
 //   admin@heartovermoney.test   admin
 //   vip@heartovermoney.test     VIP, 700 Club member
 //   member@heartovermoney.test  member
@@ -47,7 +48,7 @@ async function main() {
     menu_items, editions, artworks, follows, artists, registrations, cards, events, cities, users restart identity cascade`);
   fs.rmSync(PLACEHOLDERS, { recursive: true, force: true });
 
-  const passwordHash = await bcrypt.hash("heart-over-money", 10);
+  const passwordHash = await bcrypt.hash(process.env.SEED_PASSWORD || "heart-over-money", 10);
   const people = [
     ["admin@heartovermoney.test", "hom_admin", "HOM Admin", "admin", null],
     ["vip@heartovermoney.test", "faithful_collector", "Grace Collector", "vip", "seven_hundred_club"],

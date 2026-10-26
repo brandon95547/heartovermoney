@@ -1,0 +1,45 @@
+# Staging at heartovermoney.skylanex.com: the app and its own Postgres, in /var/www/heartovermoney
+# on the server. nginx (/etc/nginx/conf.d/heartovermoney.skylanex.com.conf) proxies to port 3100.
+# Docker brings both back after a reboot (`restart: unless-stopped`); there's no systemd unit.
+#
+# Settings come from .env next to this file (not in git): POSTGRES_PASSWORD, SESSION_SECRET,
+# SITE_URL and SEED_PASSWORD. The README's "Staging" section has the commands.
+name: heartovermoney
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hom
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: heartovermoney
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hom -d heartovermoney"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: heartovermoney-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://hom:${POSTGRES_PASSWORD}@db:5432/heartovermoney
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      SITE_URL: ${SITE_URL:?set SITE_URL in .env}
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
+      UPLOAD_DIR: /app/storage/uploads
+    ports:
+      - "127.0.0.1:3100:3000"
+    volumes:
+      # Photos people post, kept outside the image so they survive rebuilds.
+      - ./storage/uploads:/app/storage/uploads
+
+volumes:
+  pgdata:
