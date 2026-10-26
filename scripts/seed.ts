@@ -44,7 +44,7 @@ const day = 86_400_000;
 async function main() {
   // Wipe in one statement so foreign keys don't care about the order.
   await db.execute(rawSql`truncate table photo_likes, photos, order_items, orders, cart_items, bids, lots,
-    menu_items, editions, artworks, follows, artists, events, cities, cards, users restart identity cascade`);
+    menu_items, editions, artworks, follows, artists, registrations, cards, events, cities, users restart identity cascade`);
   fs.rmSync(PLACEHOLDERS, { recursive: true, force: true });
 
   const passwordHash = await bcrypt.hash("heart-over-money", 10);
@@ -211,10 +211,17 @@ async function main() {
     { userId: u.first_time_guest.id, artistId: a["nathan-marlow"].id },
   ]);
 
-  const designs = ["joker", "queen", "rabbit"] as const;
-  await db.insert(s.cards).values(Array.from({ length: 30 }, (_, i) => ({
-    code: `HOM-${String(i + 1).padStart(4, "0")}`, deck: "Charlotte 2026", design: designs[i % 3], special: i % 10 === 0,
-  })));
+  // The Charlotte deck: 30 collector cards, the Jokers scarce. Three guests have registered.
+  const deck = [...Array(4).fill("joker"), ...Array(12).fill("queen"), ...Array(14).fill("rabbit")] as ("joker" | "queen" | "rabbit")[];
+  const cards = await db.insert(s.cards).values(deck.map((design, i) => ({
+    eventId: event.id, code: `HOM-${String(i + 1).padStart(4, "0")}`, design,
+  }))).returning();
+  const firstOf = (design: string, skip = 0) => cards.filter((c) => c.design === design)[skip];
+  await db.insert(s.registrations).values([
+    { eventId: event.id, userId: u.BryanCho.id, cardId: firstOf("joker").id, jokerChoice: "kept" as const },
+    { eventId: event.id, userId: u.DizzyDolly.id, cardId: firstOf("queen").id },
+    { eventId: event.id, userId: u.sarah_parish.id, cardId: firstOf("rabbit").id, fulfillment: "ship" as const, shipAddress: "12 Elm Street, Charlotte, NC 28202" },
+  ]);
 
   console.log(`Seeded ${users.length} users, ${artworks.length} artworks, ${lots.length} lots, ${photos.length} photos.`);
 }

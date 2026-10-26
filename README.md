@@ -33,13 +33,19 @@ next.
 
 | Area | Pages |
 | --- | --- |
-| Products | Home (`/`), artwork (`/art/[slug]`), cart and checkout, order confirmation |
-| Auctions | A lot (`/auction/[id]`): VIP-only Buy Now window, then live bidding |
-| Events | List, Overview, Details (Tonight's Scoreboard), photo wall, posting a photo, food and drink |
+| Products | Home (`/`, open to everyone), artwork (`/art/[slug]`), cart and checkout, order confirmation |
+| Auctions | A lot (`/auction/[id]`): Buy Now before the event, then live bidding |
+| The next event | `/events`, the link on the cards handed out: sign in, pick the collector card you'll get at the door, the Joker's game, a line about yourself, then the door or the mail |
+| Events | Overview, Details (Tonight's Scoreboard), photo wall, posting a photo, food and drink |
+| Posts | `/posts`: every event's photos, the Home of the Posts side |
 | Collecting | Vault, certificates of authenticity with a QR code (`/certificates/[code]`), city collections |
 | Account | Sign in and up, Profile, Settings, Membership tiers, Search |
-| Onboarding | `/start`: pick a favorite card, the game, a tagline, then claim at the door or by mail |
 | Later | Chat (the Connections Messenger) has a placeholder page |
+
+One event runs at a time; `/events` always means the next one. Any membership (from $25 a
+month) makes someone a VIP, and only VIPs can buy fine art (prints and founders' art) or take
+part in the auction; merch and shoes are open to everyone. The 700 Club is $77 a month, with
+700 seats. A 700 Club member who owns more than one fine art piece is a Super Optimistic VIP.
 
 Certificate IDs follow the business plan: `TITLE_NUMBER/EDITION_CITY-ST_MM.DD.YYYY-ARTIST`.
 
@@ -68,6 +74,7 @@ boundary (Next.js Cache Components), so run it before pushing.
 
 ## Open questions
 
-The questions sent to the client are still open, among them the game's rules (what the card
-number does, what the Joker's countdown leads to), so the onboarding game is a stand-in that
-shows the flow. The logo is a stand-in until the real branding arrives.
+The client has answered most of the first questions. Still open: who counts as a Founding
+Collector, how certificates track ownership through resale, and moderating the photo wall
+(admins remove photos; the community can vote one down). The card faces and the logo are
+stand-ins until the real designs arrive.

@@ -25,12 +25,18 @@ function FormError({ state }: { state: AuthState }) {
   return state?.error ? <p role="alert" className="text-center text-sm text-alert">{state.error}</p> : null;
 }
 
+// Shown when the link on a card (heartovermoney.com/events) sent the visitor here.
+function ForTheEvent({ next }: { next: string }) {
+  return next === "/events" ? <p className="text-center text-sm">Sign in or create an account to get your card for the next event.</p> : null;
+}
+
 export function SignInForm() {
   const next = useSearchParams().get("next") ?? "/";
   const [state, action, pending] = useActionState(signIn, undefined);
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
+      <ForTheEvent next={next} />
       <Field label="Email" name="email" type="email" autoComplete="email" required defaultValue={state?.fields?.email} />
       <PasswordField autoComplete="current-password" />
       <FormError state={state} />
@@ -52,6 +58,7 @@ export function SignUpForm() {
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
+      <ForTheEvent next={next} />
       <Field label="Your name" name="displayName" autoComplete="name" required defaultValue={f.displayName} />
       <Field label="Username" name="username" autoComplete="username" required defaultValue={f.username} />
       <Field label="Email" name="email" type="email" autoComplete="email" required defaultValue={f.email} />

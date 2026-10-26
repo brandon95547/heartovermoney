@@ -3,8 +3,9 @@
 // prerenders pages, and the site builds without a database.
 import "server-only";
 import { connection } from "next/server";
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, or, sql } from "drizzle-orm";
 import { db, schema as s } from "@/db";
+import { TIERS } from "@/lib/membership";
 
 const soldCount = sql<number>`(select count(*)::int from ${s.editions} where ${s.editions.artworkId} = ${s.artworks.id})`;
 const topBid = sql<number | null>`(select max(${s.bids.amountCents}) from ${s.bids} where ${s.bids.lotId} = ${s.lots.id})`;
@@ -71,20 +72,46 @@ export async function getLot(id: string) {
   return row ?? null;
 }
 
-export async function listEvents() {
-  await connection();
-  return db.select({
-    id: s.events.id, slug: s.events.slug, title: s.events.title, startsAt: s.events.startsAt,
-    venue: s.events.venue, cityName: s.cities.name, cityState: s.cities.state, heroImage: s.cities.heroImage,
-  }).from(s.events).innerJoin(s.cities, eq(s.cities.id, s.events.cityId)).orderBy(asc(s.events.startsAt));
-}
-
 export async function getEvent(slug: string) {
   await connection();
   const [ev] = await db.select({
     event: s.events, cityName: s.cities.name, cityState: s.cities.state, citySlug: s.cities.slug,
   }).from(s.events).innerJoin(s.cities, eq(s.cities.id, s.events.cityId)).where(eq(s.events.slug, slug)).limit(1);
   return ev ?? null;
+}
+
+// The event being promoted: the next to start, or the one on now (for a day after it starts).
+// One event runs at a time.
+export async function getNextEvent() {
+  await connection();
+  const since = new Date(new Date().getTime() - 86_400_000);
+  const [ev] = await db.select({
+    id: s.events.id, slug: s.events.slug, title: s.events.title, startsAt: s.events.startsAt,
+    cityName: s.cities.name, cityState: s.cities.state,
+  }).from(s.events).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+    .where(gt(s.events.startsAt, since)).orderBy(asc(s.events.startsAt)).limit(1);
+  return ev ?? null;
+}
+
+const unclaimed = sql`not exists (select 1 from ${s.registrations} where ${s.registrations.cardId} = ${s.cards.id})`;
+
+// The cards a guest can pick from: up to three designs that still have cards left, the most
+// plentiful first, so the choice changes as the deck runs down.
+export async function listCardOptions(eventId: string) {
+  await connection();
+  return db.select({ design: s.cards.design, left: sql<number>`count(*)::int` }).from(s.cards)
+    .where(and(eq(s.cards.eventId, eventId), unclaimed))
+    .groupBy(s.cards.design).orderBy(desc(sql`count(*)`)).limit(3);
+}
+
+export async function getRegistration(eventId: string, userId: string) {
+  await connection();
+  const [r] = await db.select({
+    design: s.cards.design, code: s.cards.code, jokerChoice: s.registrations.jokerChoice,
+    fulfillment: s.registrations.fulfillment,
+  }).from(s.registrations).innerJoin(s.cards, eq(s.cards.id, s.registrations.cardId))
+    .where(and(eq(s.registrations.eventId, eventId), eq(s.registrations.userId, userId))).limit(1);
+  return r ?? null;
 }
 
 // The event contract's numbers: revenue by kind, cost, profit and the charity's share.
@@ -112,7 +139,7 @@ export async function listEventSales(eventId: string) {
   await connection();
   return db.select({
     id: s.orderItems.id, label: s.orderItems.label, quantity: s.orderItems.quantity, unitPriceCents: s.orderItems.unitPriceCents,
-    buyer: s.users.username, buyerRole: s.users.role, createdAt: s.orders.createdAt, kind: s.orders.kind,
+    buyer: s.users.username, buyerRole: s.users.role, buyerTier: s.users.membershipTier, createdAt: s.orders.createdAt, kind: s.orders.kind,
     soldBy: sql<string>`coalesce(${s.artists.name}, ${s.lots.maker}, 'Heart Over Money')`,
   }).from(s.orderItems)
     .innerJoin(s.orders, eq(s.orders.id, s.orderItems.orderId))
@@ -124,17 +151,21 @@ export async function listEventSales(eventId: string) {
     .orderBy(desc(s.orders.createdAt));
 }
 
-export async function listPhotos(eventId: string, viewerId?: string) {
+// Posted photos, newest first: one event's, or every event's for the Posts feed. Each carries
+// its event, for the hashtags and the link back to the event.
+export async function listPhotos(eventId: string | null, viewerId?: string) {
   await connection();
   return db.select({
     id: s.photos.id, image: s.photos.image, caption: s.photos.caption, createdAt: s.photos.createdAt,
     username: s.users.username,
+    eventSlug: s.events.slug, eventTitle: s.events.title, eventStartsAt: s.events.startsAt, cityName: s.cities.name,
     likes: sql<number>`(select count(*)::int from ${s.photoLikes} where ${s.photoLikes.photoId} = ${s.photos.id})`,
     liked: viewerId
       ? sql<boolean>`exists(select 1 from ${s.photoLikes} where ${s.photoLikes.photoId} = ${s.photos.id} and ${s.photoLikes.userId} = ${viewerId})`
       : sql<boolean>`false`,
   }).from(s.photos).innerJoin(s.users, eq(s.users.id, s.photos.userId))
-    .where(eq(s.photos.eventId, eventId)).orderBy(desc(s.photos.createdAt));
+    .innerJoin(s.events, eq(s.events.id, s.photos.eventId)).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+    .where(eventId ? eq(s.photos.eventId, eventId) : undefined).orderBy(desc(s.photos.createdAt)).limit(100);
 }
 
 export async function listMenu(eventId: string) {
@@ -176,11 +207,19 @@ export async function listVault(userId: string) {
   return db.select({
     code: s.editions.certificateCode, number: s.editions.number, issuedAt: s.editions.issuedAt,
     title: s.artworks.title, slug: s.artworks.slug, editionSize: s.artworks.editionSize, images: s.artworks.images,
-    cityName: s.cities.name,
+    kind: s.artworks.kind, cityName: s.cities.name,
   }).from(s.editions)
     .innerJoin(s.artworks, eq(s.artworks.id, s.editions.artworkId))
     .innerJoin(s.cities, eq(s.cities.id, s.artworks.cityId))
     .where(eq(s.editions.ownerId, userId)).orderBy(desc(s.editions.issuedAt));
+}
+
+// Seats taken in the 700 Club (its tier and the ones above it).
+export async function clubSeatsTaken() {
+  await connection();
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(s.users)
+    .where(inArray(s.users.membershipTier, TIERS.filter((t) => t.club).map((t) => t.id)));
+  return n;
 }
 
 export async function getCart(userId: string) {

@@ -7,13 +7,15 @@ import { ChevronRight, FileText } from "lucide-react";
 import { ArtImage } from "@/components/art-image";
 import { AutoRefresh, SwipeTo } from "@/components/event-client";
 import { PageHeader, ProgressBar, Skeleton, buttonClass } from "@/components/ui";
-import { getEvent, getScoreboard, listPhotos } from "@/lib/queries";
+import { CARD_DESIGNS } from "@/lib/cards";
+import { getUser } from "@/lib/dal";
+import { getEvent, getRegistration, getScoreboard, listPhotos } from "@/lib/queries";
 import { EventHeading } from "./event-heading";
 
 export default function EventOverviewPage(props: PageProps<"/events/[slug]">) {
   return (
     <main>
-      <PageHeader title="Overview" back="/events" />
+      <PageHeader title="Overview" back="/posts" />
       <Suspense fallback={<Skeleton className="m-5 h-96" />}><Overview params={props.params} /></Suspense>
     </main>
   );
@@ -24,9 +26,11 @@ async function Overview({ params }: { params: PageProps<"/events/[slug]">["param
   const found = await getEvent(slug);
   if (!found) notFound();
   const { event, cityName } = found;
-  const [score, photos] = await Promise.all([
+  const user = await getUser();
+  const [score, photos, registration] = await Promise.all([
     getScoreboard(event.id, event.costCents, event.charityPercent),
     listPhotos(event.id),
+    user ? getRegistration(event.id, user.id) : null,
   ]);
   const days = Math.max(0, Math.ceil((event.startsAt.getTime() - new Date().getTime()) / 86_400_000));
 
@@ -48,6 +52,13 @@ async function Overview({ params }: { params: PageProps<"/events/[slug]">["param
         </ul>
         <div className="min-w-0 space-y-4">
           <EventHeading host={event.hostName} city={cityName} title={event.title} startsAt={event.startsAt} />
+          {registration && (
+            <p className="rounded-md bg-ink px-3 py-2 text-xs text-white">
+              You&apos;re registered. Your {CARD_DESIGNS[registration.design].name} card is {registration.fulfillment === "ship" ? "on its way by mail" : "waiting at the door"}.
+              {registration.jokerChoice === "kept" && " You have VIP access."}
+              {registration.jokerChoice === "gift_card" && " Your $20 gift card is ready."}
+            </p>
+          )}
           <ProgressBar label="Cost" percent={score.fundedPercent} />
           <dl className="grid grid-cols-3 gap-2 text-sm">
             <div><dt className="sr-only">Funded</dt><dd className="font-bold">{score.fundedPercent}%</dd><dd className="text-xs">funded</dd></div>

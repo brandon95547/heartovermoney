@@ -1,13 +1,13 @@
 "use server";
 
-// The account: profile, membership, and finishing card onboarding.
-import { and, eq, isNull, or } from "drizzle-orm";
+// The account: profile and membership.
+import { eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema as s } from "@/db";
 import { getUser } from "@/lib/dal";
-import { TIERS } from "@/lib/membership";
+import { CLUB_SEATS, TIERS, tierById } from "@/lib/membership";
 
 export type AccountState = { error?: string; ok?: string } | undefined;
 
@@ -36,6 +36,12 @@ export async function chooseTier(form: FormData) {
   const user = await signedIn("/membership");
   const tier = TIERS.find((t) => t.id === form.get("tier"));
   if (!tier) return;
+  // The 700 Club has 700 seats; a member moving between club tiers keeps theirs.
+  if (tier.club && !tierById(user.membershipTier)?.club) {
+    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(s.users)
+      .where(inArray(s.users.membershipTier, TIERS.filter((t) => t.club).map((t) => t.id)));
+    if (n >= CLUB_SEATS) redirect("/membership?full=1");
+  }
   await db.update(s.users).set({ membershipTier: tier.id, membershipSince: new Date() }).where(eq(s.users.id, user.id));
   revalidatePath("/membership");
   revalidatePath("/profile");
@@ -45,32 +51,4 @@ export async function cancelTier() {
   const user = await signedIn("/membership");
   await db.update(s.users).set({ membershipTier: null, membershipSince: null }).where(eq(s.users.id, user.id));
   revalidatePath("/membership");
-}
-
-const Claim = z.object({
-  favorite: z.enum(["joker", "queen", "rabbit"]),
-  code: z.string().trim().toUpperCase().max(20),
-  tagline: z.string().trim().max(80),
-  fulfillment: z.enum(["pickup", "ship"]),
-  address: z.string().trim().max(300),
-});
-
-export async function completeOnboarding(_: AccountState, form: FormData): Promise<AccountState> {
-  const user = await signedIn("/start");
-  const parsed = Claim.safeParse(Object.fromEntries(["favorite", "code", "tagline", "fulfillment", "address"].map((k) => [k, form.get(k) ?? ""])));
-  if (!parsed.success) return { error: "Pick a favorite card first." };
-  const { favorite, code, tagline, fulfillment, address } = parsed.data;
-  if (fulfillment === "ship" && address.length < 10) return { error: "Enter the full shipping address." };
-
-  if (code) {
-    const [card] = await db.select().from(s.cards).where(eq(s.cards.code, code)).limit(1);
-    if (!card) return { error: "We couldn't find that card number. Check the back of your card." };
-    if (card.claimedById && card.claimedById !== user.id) return { error: "That card has already been claimed." };
-    const claimed = await db.update(s.cards).set({
-      claimedById: user.id, favoriteDesign: favorite, fulfillment, shipAddress: fulfillment === "ship" ? address : null, claimedAt: new Date(),
-    }).where(and(eq(s.cards.id, card.id), or(isNull(s.cards.claimedById), eq(s.cards.claimedById, user.id)))).returning({ id: s.cards.id });
-    if (!claimed.length) return { error: "That card has already been claimed." };
-  }
-  if (tagline) await db.update(s.users).set({ tagline }).where(eq(s.users.id, user.id));
-  return { ok: code ? `Card ${code} is yours.` : "You're in." };
 }

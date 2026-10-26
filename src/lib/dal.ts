@@ -6,6 +6,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { isVipMember } from "@/lib/membership";
 import { readSession } from "@/lib/session";
 
 export type CurrentUser = {
@@ -26,7 +27,7 @@ export const getUser = cache(async (): Promise<CurrentUser | null> => {
   if (!u) return null;
   return {
     id: u.id, username: u.username, displayName: u.displayName, email: u.email, tagline: u.tagline,
-    role: u.role, membershipTier: u.membershipTier, isVip: u.role === "vip" || u.role === "admin",
+    role: u.role, membershipTier: u.membershipTier, isVip: isVipMember(u.role, u.membershipTier),
   };
 });
 

@@ -8,8 +8,12 @@ import { redirect } from "next/navigation";
 import { db, schema as s } from "@/db";
 import { getUser } from "@/lib/dal";
 import { certificateCode } from "@/lib/certificates";
+import { needsVip } from "@/lib/membership";
 
 export type ActionState = { error?: string; ok?: string } | undefined;
+
+const VIP_ONLY = "Art is for VIP members. Become a VIP from $25 a month.";
+const AUCTION_VIP_ONLY = "The auction is for VIP members. Become a VIP from $25 a month.";
 
 async function signedIn(next: string) {
   const user = await getUser();
@@ -20,9 +24,10 @@ async function signedIn(next: string) {
 export async function addToCart(_: ActionState, form: FormData): Promise<ActionState> {
   const slug = String(form.get("slug") ?? "");
   const user = await signedIn(`/art/${slug}`);
-  const [piece] = await db.select({ id: s.artworks.id, size: s.artworks.editionSize })
+  const [piece] = await db.select({ id: s.artworks.id, size: s.artworks.editionSize, kind: s.artworks.kind })
     .from(s.artworks).where(eq(s.artworks.slug, slug)).limit(1);
   if (!piece) return { error: "That piece no longer exists." };
+  if (needsVip(piece.kind) && !user.isVip) return { error: VIP_ONLY };
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(s.editions).where(eq(s.editions.artworkId, piece.id));
   if (n >= piece.size) return { error: "This edition is sold out. It will never be reprinted." };
   await db.insert(s.cartItems).values({ userId: user.id, artworkId: piece.id, quantity: 1 })
@@ -51,13 +56,14 @@ export async function checkout(_: ActionState, form: FormData): Promise<ActionSt
     orderId = await db.transaction(async (tx) => {
       const items = await tx.select({
         artworkId: s.cartItems.artworkId, quantity: s.cartItems.quantity, title: s.artworks.title,
-        priceCents: s.artworks.priceCents, editionSize: s.artworks.editionSize, prefix: s.artworks.certificatePrefix,
+        priceCents: s.artworks.priceCents, editionSize: s.artworks.editionSize, prefix: s.artworks.certificatePrefix, kind: s.artworks.kind,
         cityName: s.cities.name, cityState: s.cities.state,
       }).from(s.cartItems)
         .innerJoin(s.artworks, eq(s.artworks.id, s.cartItems.artworkId))
         .innerJoin(s.cities, eq(s.cities.id, s.artworks.cityId))
         .where(eq(s.cartItems.userId, user.id));
       if (!items.length) throw new CheckoutError("Your cart is empty.");
+      if (!user.isVip && items.some((i) => needsVip(i.kind))) throw new CheckoutError(VIP_ONLY);
 
       const total = items.reduce((t, i) => t + i.priceCents * i.quantity, 0);
       const [order] = await tx.insert(s.orders).values({
@@ -96,6 +102,7 @@ class CheckoutError extends Error {}
 export async function buyNow(_: ActionState, form: FormData): Promise<ActionState> {
   const lotId = String(form.get("lotId") ?? "");
   const user = await signedIn(`/auction/${lotId}`);
+  if (!user.isVip) return { error: AUCTION_VIP_ONLY };
   const now = new Date();
   let orderId: string;
   try {
@@ -104,7 +111,6 @@ export async function buyNow(_: ActionState, form: FormData): Promise<ActionStat
       const [lot] = await tx.select().from(s.lots).where(eq(s.lots.id, lotId)).limit(1);
       if (!lot || lot.status !== "open" || !lot.buyNowCents) throw new CheckoutError("This lot can no longer be bought outright.");
       if (now >= lot.auctionStartsAt) throw new CheckoutError("The live auction has started. Place a bid instead.");
-      if (lot.vipUntil && now < lot.vipUntil && !user.isVip) throw new CheckoutError("VIPs get first pick of this lot. It opens to everyone soon.");
       const [order] = await tx.insert(s.orders).values({
         userId: user.id, kind: "lot", status: "paid", totalCents: lot.buyNowCents, eventId: lot.eventId, fulfillment: "pickup",
       }).returning({ id: s.orders.id });
@@ -125,6 +131,7 @@ const minIncrement = (cents: number) => (cents < 100_000 ? 2_500 : 5_000);
 export async function placeBid(_: ActionState, form: FormData): Promise<ActionState> {
   const lotId = String(form.get("lotId") ?? "");
   const user = await signedIn(`/auction/${lotId}`);
+  if (!user.isVip) return { error: AUCTION_VIP_ONLY };
   const amountCents = Math.round(Number(form.get("amount")) * 100);
   if (!Number.isFinite(amountCents) || amountCents <= 0) return { error: "Enter a bid amount." };
   const now = new Date();

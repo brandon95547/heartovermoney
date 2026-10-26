@@ -2,8 +2,9 @@
 
 // The bottom navigation (screen design page 27). Home, Search and Profile stay put; the
 // center button shows which side you are on, Posts (♥) or Products ($), and opens a menu to
-// switch sides or reach the Vault and Settings. The right-hand button follows the side:
-// Chat for Posts, Cart for Products.
+// switch sides or reach the Vault and Settings. Home is the side's main screen: the photo
+// feed for Posts, the products page (page 24) for Products. The right-hand button follows the
+// side: Chat for Posts, Cart for Products.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -11,16 +12,17 @@ import {
   House, Search, Heart, CircleDollarSign, CircleMinus, User, MessageSquareMore, ShoppingCart, Lock, Settings,
 } from "lucide-react";
 
-const POSTS_PATHS = ["/events", "/chat"];
-const HIDDEN_ON = ["/start", "/signin", "/signup"];
+const POSTS_PATHS = ["/posts", "/events", "/chat"];
+const HIDDEN_ON = ["/signin", "/signup"];
 
 export function BottomNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
+  // /events itself is the full-screen card process; the event's own pages keep the nav.
+  if (pathname === "/events" || HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
   const posts = POSTS_PATHS.some((p) => pathname.startsWith(p));
-  const dark = /^\/events\/[^/]+\/photos\/?$/.test(pathname);
+  const dark = /^\/(posts|events\/[^/]+\/photos)\/?$/.test(pathname);
   const Center = open ? CircleMinus : posts ? Heart : CircleDollarSign;
 
   const item = (href: string, label: string, Icon: typeof House, active = pathname === href) => (
@@ -38,7 +40,7 @@ export function BottomNav() {
         <div className="absolute inset-x-0 bottom-full mx-auto flex max-w-md justify-around border-t border-line bg-paper px-2 py-3 text-ink shadow-lg md:max-w-2xl">
           {[
             ["/vault", "Vault", Lock],
-            ["/events", "Posts", Heart],
+            ["/posts", "Posts", Heart],
             ["/", "Products", CircleDollarSign],
             ["/settings", "Settings", Settings],
           ].map(([href, label, Icon]) => {
@@ -54,7 +56,7 @@ export function BottomNav() {
         </div>
       )}
       <div className="mx-auto flex max-w-md items-stretch md:max-w-2xl">
-        {item(posts ? "/events" : "/", "Home", House)}
+        {item(posts ? "/posts" : "/", "Home", House)}
         {item("/search", "Search", Search)}
         <button type="button" aria-label={posts ? "Posts menu" : "Products menu"} aria-expanded={open}
           onClick={() => setOpen((o) => !o)}

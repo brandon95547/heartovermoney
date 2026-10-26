@@ -1,5 +1,7 @@
 // An Art + Charity auction lot (screen design pages 5, 12, 13). Before the event it is a
-// "Buy Now" page (VIPs first); once the live auction opens it is a "Live Auction" page.
+// "Buy Now" page; once the live auction opens it is a "Live Auction" page. Only VIPs can buy
+// or bid: art is for VIP members.
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Gallery } from "@/components/gallery";
@@ -33,7 +35,7 @@ async function Lot({ params }: { params: PageProps<"/auction/[id]">["params"] })
   const now = new Date();
   const live = now >= lot.auctionStartsAt && now <= lot.auctionEndsAt;
   const before = now < lot.auctionStartsAt;
-  const vipOnly = !!lot.vipUntil && now < lot.vipUntil;
+  const vip = !!user?.isVip;
   const current = lot.topBidCents ?? lot.startingBidCents;
   const minBid = lot.topBidCents ? lot.topBidCents + increment(lot.topBidCents) : lot.startingBidCents;
   const sold = lot.status === "sold";
@@ -72,12 +74,14 @@ async function Lot({ params }: { params: PageProps<"/auction/[id]">["params"] })
           <p className="rounded-full bg-mist py-3 text-center text-sm font-semibold">Sold for {money(lot.soldCents ?? 0)}</p>
         ) : (
           <LotActions lotId={lot.id} minBidDollars={minBid / 100}
-            canBuyNow={!!lot.buyNowCents && before && (!vipOnly || !!user?.isVip)}
-            canBid={live}
-            buyNowLabel={vipOnly && !user?.isVip ? "VIPs first" : "Buy Now"} />
+            canBuyNow={!!lot.buyNowCents && before && vip}
+            canBid={live && vip}
+            buyNowLabel="Buy Now" />
         )}
-        {vipOnly && !sold && (
-          <p className="text-xs text-vip">VIP early access: VIPs can Buy Now until {eventDate(lot.vipUntil!)}. Everyone can bid in the live auction.</p>
+        {!vip && !sold && (
+          <p className="text-xs text-vip">
+            The auction is for VIP members. <Link href="/membership" className="font-semibold underline">Become a VIP</Link> from $25 a month.
+          </p>
         )}
         <p className="text-sm leading-relaxed"><b>{lot.maker} • {lot.title}</b> {lot.description}</p>
         <p className="border-t border-line pt-4 text-xs leading-relaxed text-muted">

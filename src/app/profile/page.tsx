@@ -7,8 +7,8 @@ import { Logo } from "@/components/logo";
 import { PageHeader, SectionLabel, Skeleton, buttonClass } from "@/components/ui";
 import { getUser } from "@/lib/dal";
 import { money } from "@/lib/format";
-import { tierById } from "@/lib/membership";
-import { listOrders } from "@/lib/queries";
+import { FINE_ART_KINDS, isSuperOptimistic, tierById } from "@/lib/membership";
+import { listOrders, listVault } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Profile" };
 
@@ -34,7 +34,8 @@ async function Profile() {
     );
   }
   const tier = tierById(user.membershipTier);
-  const orders = await listOrders(user.id);
+  const [orders, vault] = await Promise.all([listOrders(user.id), listVault(user.id)]);
+  const superOptimistic = isSuperOptimistic(user.membershipTier, vault.filter((p) => FINE_ART_KINDS.includes(p.kind)).length);
   const link = (href: string, label: string, detail?: string) => (
     <Link href={href} className="flex items-center justify-between py-4 text-sm">
       <span>{label}</span><span className="flex items-center gap-2 text-muted">{detail}<ChevronRight className="size-4" /></span>
@@ -47,13 +48,17 @@ async function Profile() {
         <div>
           <p className="text-lg font-semibold">{user.displayName}</p>
           <p className="text-sm text-muted">@{user.username}{user.tagline ? ` · ${user.tagline}` : ""}</p>
-          {user.isVip && <span className="mt-1 inline-block rounded bg-vip px-2 py-0.5 text-[10px] font-bold uppercase text-white">VIP</span>}
+          {user.isVip && (
+            <span className="mt-1 inline-block rounded bg-vip px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+              {superOptimistic ? "Super Optimistic VIP" : "VIP"}
+            </span>
+          )}
         </div>
       </div>
       <nav className="divide-y divide-line border-y border-line">
         {link("/vault", "Vault", "Your collection")}
         {link("/membership", "Membership", tier ? tier.name : "Join")}
-        {link("/start", "Claim a card")}
+        {link("/events", "The next event")}
         {link("/settings", "Settings")}
       </nav>
       <section>

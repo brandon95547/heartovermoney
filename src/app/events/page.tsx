@@ -1,46 +1,44 @@
-// Posts home: the events, each with its overview, photo wall and menu.
+// heartovermoney.com/events, the link on the cards handed out before an event: the card process
+// for the next event. One event runs at a time. Signing in comes first (development overview
+// page 2); someone already registered goes on to the event itself.
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { ArtImage } from "@/components/art-image";
-import { Logo } from "@/components/logo";
-import { Skeleton } from "@/components/ui";
+import { buttonClass } from "@/components/ui";
+import { requireUser } from "@/lib/dal";
 import { eventDate } from "@/lib/format";
-import { listEvents } from "@/lib/queries";
+import { getNextEvent, getRegistration, listCardOptions } from "@/lib/queries";
+import { CardProcess } from "./card-process";
 
-export const metadata: Metadata = { title: "Events" };
+export const metadata: Metadata = { title: "The next event" };
 
-export default function EventsPage() {
+export default function NextEventPage() {
   return (
-    <main className="px-5 pb-8">
-      <div className="flex justify-center py-6"><Logo size={56} /></div>
-      <h1 className="mb-4 text-lg">Events</h1>
-      <Suspense fallback={<Skeleton className="h-56" />}><Events /></Suspense>
+    <main className="chevrons fixed inset-0 z-50 mx-auto flex max-w-md flex-col text-white md:max-w-2xl">
+      <div className="flex justify-end p-4"><Link href="/" className="text-sm">Skip</Link></div>
+      <Suspense fallback={<div className="flex-1" />}><Registration /></Suspense>
     </main>
   );
 }
 
-async function Events() {
-  const events = await listEvents();
+async function Registration() {
+  const event = await getNextEvent();
+  if (!event) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
+        <p className="text-2xl font-bold">The next event is on its way</p>
+        <p className="text-sm text-white/80">Check back soon for the city and the date.</p>
+        <Link href="/" className={buttonClass("outline", "border-white text-white hover:bg-white/10")}>See the collection</Link>
+      </div>
+    );
+  }
+  const user = await requireUser("/events");
+  if (await getRegistration(event.id, user.id)) redirect(`/events/${event.slug}`);
+  const options = await listCardOptions(event.id);
   return (
-    <ul className="space-y-4">
-      {events.map((e) => (
-        <li key={e.id}>
-          <Link href={`/events/${e.slug}`} className="block overflow-hidden rounded-md border border-line">
-            <div className="relative aspect-[16/8] bg-mist"><ArtImage src={e.heroImage} alt={e.cityName} /></div>
-            <div className="p-4">
-              <p className="text-xs text-muted">{e.cityName}, {e.cityState} · {e.venue}</p>
-              <p className="text-lg font-bold">{e.title}</p>
-              <p className="text-xs">{eventDate(e.startsAt)}</p>
-            </div>
-          </Link>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs font-semibold">
-            <Link href={`/events/${e.slug}/photos`} className="rounded-full bg-fog py-2">Photo wall</Link>
-            <Link href={`/events/${e.slug}/details`} className="rounded-full bg-fog py-2">Scoreboard</Link>
-            <Link href={`/events/${e.slug}/menu`} className="rounded-full bg-fog py-2">Food + drink</Link>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <CardProcess
+      event={{ id: event.id, title: event.title, place: `${event.cityName}, ${event.cityState}`, when: eventDate(event.startsAt) }}
+      options={options.map((o) => o.design)} tagline={user.tagline ?? ""} vipMember={user.isVip} />
   );
 }

@@ -6,7 +6,9 @@ import { Suspense } from "react";
 import { Gallery } from "@/components/gallery";
 import { AddToCart } from "@/components/shop-forms";
 import { PageHeader, Skeleton } from "@/components/ui";
+import { getUser } from "@/lib/dal";
 import { kindLabel, money } from "@/lib/format";
+import { needsVip } from "@/lib/membership";
 import { getArtwork } from "@/lib/queries";
 
 export default function ArtPage(props: PageProps<"/art/[slug]">) {
@@ -22,7 +24,7 @@ export default function ArtPage(props: PageProps<"/art/[slug]">) {
 
 async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"] }) {
   const { slug } = await params;
-  const a = await getArtwork(slug);
+  const [a, user] = await Promise.all([getArtwork(slug), getUser()]);
   if (!a) notFound();
   const left = a.editionSize - a.sold;
   const soldOut = left <= 0;
@@ -37,7 +39,7 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
           <h2 className="mt-2 text-lg font-semibold leading-snug">{a.title}</h2>
           <p className="text-sm">by <span className="font-bold">{a.artistName}</span></p>
         </div>
-        <AddToCart slug={a.slug} soldOut={soldOut} />
+        <AddToCart slug={a.slug} soldOut={soldOut} vipOnly={needsVip(a.kind) && !user?.isVip} />
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div><dt className="text-xs text-muted">Edition</dt><dd className="font-semibold">{a.editionSize} pieces</dd></div>
           <div><dt className="text-xs text-muted">Available</dt><dd className="font-semibold">{soldOut ? "None, never reprinted" : `${left} of ${a.editionSize}`}</dd></div>

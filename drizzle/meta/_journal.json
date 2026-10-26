@@ -8,6 +8,20 @@
       "when": 1792972548649,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792988056401,
+      "tag": "0001_cards_drop_claim_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792988057377,
+      "tag": "0002_cards_per_event",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 // The database schema (Drizzle ORM, Postgres). Money is stored in cents.
 import {
-  pgTable, pgEnum, uuid, text, integer, boolean, timestamp, jsonb, primaryKey, uniqueIndex, index,
+  pgTable, pgEnum, uuid, text, integer, timestamp, jsonb, primaryKey, uniqueIndex, index,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["member", "vip", "admin"]);
@@ -13,6 +13,7 @@ export const orderKindEnum = pgEnum("order_kind", ["art", "lot", "food", "ticket
 export const orderStatusEnum = pgEnum("order_status", ["pending", "paid"]);
 export const fulfillmentEnum = pgEnum("fulfillment", ["pickup", "ship"]);
 export const cardDesignEnum = pgEnum("card_design", ["joker", "queen", "rabbit"]);
+export const jokerChoiceEnum = pgEnum("joker_choice", ["kept", "gift_card"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -185,17 +186,25 @@ export const photoLikes = pgTable("photo_likes", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
 }, (t) => [primaryKey({ columns: [t.photoId, t.userId] })]);
 
-// A printed collector card handed out at events. The holder redeems it on the site.
-// The game rules behind `special` and the Joker countdown are still open questions.
+// One collector card in an event's printed deck, each with its own code. Registering for the
+// event reserves one, and the guest collects it at the door (or has it mailed).
 export const cards = pgTable("cards", {
   id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id),
   code: text("code").notNull().unique(),
-  deck: text("deck").notNull(),
   design: cardDesignEnum("design").notNull(),
-  special: boolean("special").notNull().default(false),
-  claimedById: uuid("claimed_by_id").references(() => users.id),
-  favoriteDesign: cardDesignEnum("favorite_design"),
-  fulfillment: fulfillmentEnum("fulfillment"),
+}, (t) => [index("cards_event").on(t.eventId)]);
+
+// Registering for an event through the card process at /events: the card picked, and, for
+// the Joker, what was chosen against the clock: keeping it (VIP access at the event, which
+// the guest doesn't know when choosing) or a guaranteed $20 gift card to spend there.
+export const registrations = pgTable("registrations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  cardId: uuid("card_id").notNull().unique().references(() => cards.id),
+  jokerChoice: jokerChoiceEnum("joker_choice"),
+  fulfillment: fulfillmentEnum("fulfillment").notNull().default("pickup"),
   shipAddress: text("ship_address"),
-  claimedAt: timestamp("claimed_at", { withTimezone: true }),
-});
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("registrations_event_user").on(t.eventId, t.userId)]);

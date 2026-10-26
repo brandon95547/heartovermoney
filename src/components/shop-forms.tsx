@@ -2,6 +2,7 @@
 
 // Forms that buy: Add to cart, Buy Now, Place bid and checkout. Each shows the action's
 // message (an error, or a confirmation) under its button.
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { addToCart, buyNow, checkout, placeBid, type ActionState } from "@/app/actions/shop";
 import { buttonClass } from "@/components/ui";
@@ -12,8 +13,17 @@ function Message({ state }: { state: ActionState }) {
   return null;
 }
 
-export function AddToCart({ slug, soldOut }: { slug: string; soldOut: boolean }) {
+// `vipOnly`: the piece is art and the visitor isn't a VIP, so it points to Membership instead.
+export function AddToCart({ slug, soldOut, vipOnly = false }: { slug: string; soldOut: boolean; vipOnly?: boolean }) {
   const [state, action, pending] = useActionState(addToCart, undefined);
+  if (vipOnly && !soldOut) {
+    return (
+      <div>
+        <Link href="/membership" className={buttonClass("primary", "w-52")}>VIP members only</Link>
+        <p className="mt-2 text-sm text-muted">Art is for VIP members. Membership starts at $25 a month.</p>
+      </div>
+    );
+  }
   return (
     <form action={action}>
       <input type="hidden" name="slug" value={slug} />

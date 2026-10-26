@@ -8,13 +8,14 @@ import { AutoRefresh } from "@/components/event-client";
 import { PageHeader, ProgressBar, SectionLabel, Skeleton } from "@/components/ui";
 import { getUser } from "@/lib/dal";
 import { money } from "@/lib/format";
+import { isVipMember } from "@/lib/membership";
 import { getEvent, getScoreboard, listEventSales } from "@/lib/queries";
 import { EventHeading } from "../event-heading";
 
 export default function EventDetailsPage(props: PageProps<"/events/[slug]/details">) {
   return (
     <main>
-      <Suspense fallback={<><PageHeader title="Details" back="/events" /><Skeleton className="m-5 h-96" /></>}>
+      <Suspense fallback={<><PageHeader title="Details" back="/posts" /><Skeleton className="m-5 h-96" /></>}>
         <Details params={props.params} />
       </Suspense>
     </main>
@@ -35,7 +36,7 @@ async function Details({ params }: { params: PageProps<"/events/[slug]/details">
     getUser(),
   ]);
   const costShare = score.net > 0 ? (event.costCents / score.revenue) * 100 : 100;
-  const showName = (username: string, role: string) => (role === "member" || viewer?.isVip ? `@${username}` : mask());
+  const showName = (username: string, role: string, tier: string | null) => (!isVipMember(role, tier) || viewer?.isVip ? `@${username}` : mask());
 
   return (
     <>
@@ -89,7 +90,7 @@ async function Details({ params }: { params: PageProps<"/events/[slug]/details">
               {sales.map((sale) => (
                 <tr key={sale.id} className="border-t border-line/60">
                   <td className="py-1.5">{sale.soldBy}</td>
-                  <td className="py-1.5">{showName(sale.buyer, sale.buyerRole)}</td>
+                  <td className="py-1.5">{showName(sale.buyer, sale.buyerRole, sale.buyerTier)}</td>
                   <td className="py-1.5 text-right">{money(sale.unitPriceCents * sale.quantity)}</td>
                 </tr>
               ))}
