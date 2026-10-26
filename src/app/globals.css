@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Brand: black and white, after the heart-over-dollar mark, with the accents the screen
+   designs use. Every color here is a Tailwind token (bg-ink, text-vip, ...). */
+@theme {
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #111111;
+  --color-paper: #ffffff;
+  --color-charcoal: #3b3742; /* primary buttons: Buy Now, Place order */
+  --color-mist: #e8eded;     /* progress tracks, wells */
+  --color-fog: #f5f6f6;      /* page wells, document rows */
+  --color-muted: #6b6870;    /* secondary text */
+  --color-line: #dedfe1;     /* dividers */
+  --color-vip: #5528e0;      /* charity, VIP */
+  --color-go: #1f8f3a;       /* progress, success */
+  --color-alert: #d93025;    /* time left, errors */
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* The onboarding background: a dark chevron pattern, as on the "Select your favorite" screen. */
+.chevrons {
+  background-color: #000;
+  background-image: linear-gradient(135deg, #1b1b1b 25%, transparent 25%),
+    linear-gradient(225deg, #1b1b1b 25%, transparent 25%);
+  background-size: 28px 28px;
+}
+
+/* Full-screen photo wall: one photo per screen, snapping. */
+.snap-wall {
+  scroll-snap-type: y mandatory;
+}
+.snap-wall > * {
+  scroll-snap-align: start;
+}

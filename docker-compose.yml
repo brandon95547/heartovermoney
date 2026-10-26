@@ -1,0 +1,18 @@
+# Local Postgres for development: `docker compose up -d db`.
+# Port 5434, clear of other projects' Postgres on this machine.
+services:
+  db:
+    image: postgres:16
+    container_name: hom_postgres
+    environment:
+      POSTGRES_USER: hom
+      POSTGRES_PASSWORD: hom
+      POSTGRES_DB: heartovermoney
+    ports: ["5434:5432"]
+    volumes: ["hom_pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hom -d heartovermoney"]
+      interval: 3s
+      retries: 20
+volumes:
+  hom_pgdata:

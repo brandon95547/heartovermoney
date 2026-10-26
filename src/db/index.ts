@@ -1,0 +1,14 @@
+// The database connection, shared by server code. One pool per process; in development the
+// module reloads on every edit, so the pool is kept on globalThis instead of being re-created.
+import "server-only";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
+
+const globalForDb = globalThis as unknown as { sql?: ReturnType<typeof postgres> };
+
+const sql = globalForDb.sql ?? postgres(process.env.DATABASE_URL!, { max: 10 });
+if (process.env.NODE_ENV !== "production") globalForDb.sql = sql;
+
+export const db = drizzle(sql, { schema });
+export { schema };
