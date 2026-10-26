@@ -3,7 +3,7 @@
 // prerenders pages, and the site builds without a database.
 import "server-only";
 import { connection } from "next/server";
-import { and, asc, desc, eq, gt, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { db, schema as s } from "@/db";
 import { TIERS } from "@/lib/membership";
 
@@ -151,21 +151,36 @@ export async function listEventSales(eventId: string) {
     .orderBy(desc(s.orders.createdAt));
 }
 
-// Posted photos, newest first: one event's, or every event's for the Posts feed. Each carries
-// its event, for the hashtags and the link back to the event.
+// Posted photos still on the wall, newest first: one event's, or every event's for the Posts
+// feed. Each carries its event, for the hashtags and the link back to the event.
 export async function listPhotos(eventId: string | null, viewerId?: string) {
   await connection();
   return db.select({
     id: s.photos.id, image: s.photos.image, caption: s.photos.caption, createdAt: s.photos.createdAt,
-    username: s.users.username,
+    userId: s.photos.userId, username: s.users.username,
     eventSlug: s.events.slug, eventTitle: s.events.title, eventStartsAt: s.events.startsAt, cityName: s.cities.name,
     likes: sql<number>`(select count(*)::int from ${s.photoLikes} where ${s.photoLikes.photoId} = ${s.photos.id})`,
     liked: viewerId
       ? sql<boolean>`exists(select 1 from ${s.photoLikes} where ${s.photoLikes.photoId} = ${s.photos.id} and ${s.photoLikes.userId} = ${viewerId})`
       : sql<boolean>`false`,
+    downvoted: viewerId
+      ? sql<boolean>`exists(select 1 from ${s.photoDownvotes} where ${s.photoDownvotes.photoId} = ${s.photos.id} and ${s.photoDownvotes.userId} = ${viewerId})`
+      : sql<boolean>`false`,
   }).from(s.photos).innerJoin(s.users, eq(s.users.id, s.photos.userId))
     .innerJoin(s.events, eq(s.events.id, s.photos.eventId)).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
-    .where(eventId ? eq(s.photos.eventId, eventId) : undefined).orderBy(desc(s.photos.createdAt)).limit(100);
+    .where(and(isNull(s.photos.removedAt), eventId ? eq(s.photos.eventId, eventId) : undefined))
+    .orderBy(desc(s.photos.createdAt)).limit(100);
+}
+
+// Photos taken off the wall, for admins to review and restore.
+export async function listRemovedPhotos() {
+  await connection();
+  return db.select({
+    id: s.photos.id, image: s.photos.image, caption: s.photos.caption, username: s.users.username,
+    eventTitle: s.events.title, removedAt: s.photos.removedAt, removedBy: s.photos.removedBy,
+    downvotes: sql<number>`(select count(*)::int from ${s.photoDownvotes} where ${s.photoDownvotes.photoId} = ${s.photos.id})`,
+  }).from(s.photos).innerJoin(s.users, eq(s.users.id, s.photos.userId)).innerJoin(s.events, eq(s.events.id, s.photos.eventId))
+    .where(isNotNull(s.photos.removedAt)).orderBy(desc(s.photos.removedAt));
 }
 
 export async function listMenu(eventId: string) {

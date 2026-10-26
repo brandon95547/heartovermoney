@@ -22,6 +22,13 @@
       "when": 1792988057377,
       "tag": "0002_cards_per_event",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793047207832,
+      "tag": "0003_photo_moderation",
+      "breakpoints": true
     }
   ]
 }

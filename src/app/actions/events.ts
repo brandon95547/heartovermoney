@@ -1,10 +1,10 @@
 "use server";
 
 // Event actions: register through the card process, like a photo, post one to the photo wall,
-// and order food and drink.
+// moderate the wall, and order food and drink.
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -72,7 +72,11 @@ export async function registerForEvent(_: RegistrationState, form: FormData): Pr
   return { done: { design: favorite, jokerChoice, ship, slug: event.slug } };
 }
 
+// Photo IDs come from the page; anything that isn't one is ignored rather than queried.
+const isId = (v: string) => /^[0-9a-f-]{36}$/i.test(v);
+
 export async function toggleLike(photoId: string, eventSlug: string) {
+  if (!isId(photoId)) return;
   const user = await getUser();
   if (!user) redirect(`/signin?next=${encodeURIComponent(`/events/${eventSlug}/photos`)}`);
   const where = and(eq(s.photoLikes.photoId, photoId), eq(s.photoLikes.userId, user.id));
@@ -81,6 +85,63 @@ export async function toggleLike(photoId: string, eventSlug: string) {
   else await db.insert(s.photoLikes).values({ photoId, userId: user.id }).onConflictDoNothing();
   revalidatePath(`/events/${eventSlug}/photos`);
   revalidatePath("/posts");
+}
+
+// Moderating the wall (the client: "admin rights to remove", and "the community of users the
+// ability to thumbs down an image to remove as well"). This many thumbs-downs from different
+// people take a photo off the wall; admins can restore it from /admin/photos.
+const REMOVE_AFTER_DOWNVOTES = 5;
+
+function refreshWalls(eventSlug: string) {
+  revalidatePath(`/events/${eventSlug}/photos`);
+  revalidatePath(`/events/${eventSlug}`);
+  revalidatePath("/posts");
+}
+
+export async function toggleDownvote(photoId: string, eventSlug: string) {
+  if (!isId(photoId)) return;
+  const user = await getUser();
+  if (!user) redirect(`/signin?next=${encodeURIComponent("/posts")}`);
+  const [photo] = await db.select({ userId: s.photos.userId }).from(s.photos).where(eq(s.photos.id, photoId)).limit(1);
+  if (!photo || photo.userId === user.id) return;
+  const where = and(eq(s.photoDownvotes.photoId, photoId), eq(s.photoDownvotes.userId, user.id));
+  const [existing] = await db.select().from(s.photoDownvotes).where(where).limit(1);
+  if (existing) {
+    await db.delete(s.photoDownvotes).where(where);
+  } else {
+    await db.insert(s.photoDownvotes).values({ photoId, userId: user.id }).onConflictDoNothing();
+    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(s.photoDownvotes).where(eq(s.photoDownvotes.photoId, photoId));
+    if (n >= REMOVE_AFTER_DOWNVOTES) {
+      await db.update(s.photos).set({ removedAt: new Date(), removedBy: "community" })
+        .where(and(eq(s.photos.id, photoId), isNull(s.photos.removedAt)));
+    }
+  }
+  refreshWalls(eventSlug);
+}
+
+export async function removePhoto(photoId: string, eventSlug: string) {
+  if (!isId(photoId)) return;
+  const user = await getUser();
+  if (user?.role !== "admin") return;
+  await db.update(s.photos).set({ removedAt: new Date(), removedBy: "admin" })
+    .where(and(eq(s.photos.id, photoId), isNull(s.photos.removedAt)));
+  refreshWalls(eventSlug);
+}
+
+// Puts a photo back on the wall and clears its thumbs-downs, so one more doesn't take it
+// straight back off.
+export async function restorePhoto(form: FormData) {
+  const user = await getUser();
+  if (user?.role !== "admin") return;
+  const photoId = String(form.get("photoId") ?? "");
+  if (!isId(photoId)) return;
+  const [photo] = await db.update(s.photos).set({ removedAt: null, removedBy: null })
+    .where(eq(s.photos.id, photoId)).returning({ eventId: s.photos.eventId });
+  if (!photo) return;
+  await db.delete(s.photoDownvotes).where(eq(s.photoDownvotes.photoId, photoId));
+  const [event] = await db.select({ slug: s.events.slug }).from(s.events).where(eq(s.events.id, photo.eventId)).limit(1);
+  refreshWalls(event.slug);
+  revalidatePath("/admin/photos");
 }
 
 const TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };

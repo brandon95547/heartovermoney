@@ -14,6 +14,7 @@ export const orderStatusEnum = pgEnum("order_status", ["pending", "paid"]);
 export const fulfillmentEnum = pgEnum("fulfillment", ["pickup", "ship"]);
 export const cardDesignEnum = pgEnum("card_design", ["joker", "queen", "rabbit"]);
 export const jokerChoiceEnum = pgEnum("joker_choice", ["kept", "gift_card"]);
+export const photoRemovalEnum = pgEnum("photo_removal", ["admin", "community"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -171,7 +172,8 @@ export const orderItems = pgTable("order_items", {
   unitPriceCents: integer("unit_price_cents").notNull(),
 });
 
-// A photo posted to an event's photo wall.
+// A photo posted to an event's photo wall. A removed photo (by an admin, or by enough of the
+// community's thumbs-downs) leaves the wall but is kept, so an admin can restore it.
 export const photos = pgTable("photos", {
   id: uuid("id").primaryKey().defaultRandom(),
   eventId: uuid("event_id").notNull().references(() => events.id),
@@ -179,9 +181,16 @@ export const photos = pgTable("photos", {
   image: text("image").notNull(),
   caption: text("caption").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  removedAt: timestamp("removed_at", { withTimezone: true }),
+  removedBy: photoRemovalEnum("removed_by"),
 }, (t) => [index("photos_event").on(t.eventId)]);
 
 export const photoLikes = pgTable("photo_likes", {
+  photoId: uuid("photo_id").notNull().references(() => photos.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.photoId, t.userId] })]);
+
+export const photoDownvotes = pgTable("photo_downvotes", {
   photoId: uuid("photo_id").notNull().references(() => photos.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
 }, (t) => [primaryKey({ columns: [t.photoId, t.userId] })]);

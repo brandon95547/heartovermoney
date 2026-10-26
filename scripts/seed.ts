@@ -43,7 +43,7 @@ const day = 86_400_000;
 
 async function main() {
   // Wipe in one statement so foreign keys don't care about the order.
-  await db.execute(rawSql`truncate table photo_likes, photos, order_items, orders, cart_items, bids, lots,
+  await db.execute(rawSql`truncate table photo_downvotes, photo_likes, photos, order_items, orders, cart_items, bids, lots,
     menu_items, editions, artworks, follows, artists, registrations, cards, events, cities, users restart identity cascade`);
   fs.rmSync(PLACEHOLDERS, { recursive: true, force: true });
 

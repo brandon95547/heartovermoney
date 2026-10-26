@@ -37,7 +37,7 @@ next.
 | Auctions | A lot (`/auction/[id]`): Buy Now before the event, then live bidding |
 | The next event | `/events`, the link on the cards handed out: sign in, pick the collector card you'll get at the door, the Joker's game, a line about yourself, then the door or the mail |
 | Events | Overview, Details (Tonight's Scoreboard), photo wall, posting a photo, food and drink |
-| Posts | `/posts`: every event's photos, the Home of the Posts side |
+| Posts | `/posts`: every event's photos, the Home of the Posts side. People can thumbs-down a photo (five take it off the wall); admins can remove one, and restore removed photos at `/admin/photos` |
 | Collecting | Vault, certificates of authenticity with a QR code (`/certificates/[code]`), city collections |
 | Account | Sign in and up, Profile, Settings, Membership tiers, Search |
 | Later | Chat (the Connections Messenger) has a placeholder page |
@@ -75,6 +75,5 @@ boundary (Next.js Cache Components), so run it before pushing.
 ## Open questions
 
 The client has answered most of the first questions. Still open: who counts as a Founding
-Collector, how certificates track ownership through resale, and moderating the photo wall
-(admins remove photos; the community can vote one down). The card faces and the logo are
-stand-ins until the real designs arrive.
+Collector, and how certificates track ownership through resale. The card faces and the logo
+are stand-ins until the real designs arrive.

@@ -21,5 +21,5 @@ async function Wall({ params }: { params: PageProps<"/events/[slug]/photos">["pa
   if (!found) notFound();
   const user = await getUser();
   const photos = await listPhotos(found.event.id, user?.id);
-  return <PhotoWall photos={photos} back={{ href: `/events/${slug}`, label: "Back to the event" }} postHref={`/events/${slug}/photos/new`} />;
+  return <PhotoWall photos={photos} viewer={user && { id: user.id, isAdmin: user.role === "admin" }} back={{ href: `/events/${slug}`, label: "Back to the event" }} postHref={`/events/${slug}/photos/new`} />;
 }

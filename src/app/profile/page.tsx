@@ -60,6 +60,7 @@ async function Profile() {
         {link("/membership", "Membership", tier ? tier.name : "Join")}
         {link("/events", "The next event")}
         {link("/settings", "Settings")}
+        {user.role === "admin" && link("/admin/photos", "Removed photos")}
       </nav>
       <section>
         <SectionLabel className="mb-2">Orders</SectionLabel>

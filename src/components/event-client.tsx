@@ -3,8 +3,8 @@
 // Small interactive pieces of the event pages.
 import { useActionState, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Heart } from "lucide-react";
-import { orderFood, postPhoto, toggleLike, type EventActionState } from "@/app/actions/events";
+import { Heart, ThumbsDown, Trash2 } from "lucide-react";
+import { orderFood, postPhoto, removePhoto, toggleDownvote, toggleLike, type EventActionState } from "@/app/actions/events";
 import { buttonClass } from "@/components/ui";
 import { money } from "@/lib/format";
 
@@ -49,6 +49,42 @@ export function LikeButton({ photoId, slug, liked, count }: { photoId: string; s
       className="flex flex-col items-center gap-1 text-xs drop-shadow">
       <Heart className={`size-8 ${state.liked ? "fill-white" : ""}`} strokeWidth={1.5} />
       {state.count.toLocaleString("en-US")}
+    </button>
+  );
+}
+
+// Enough thumbs-downs take a photo off the wall; the count isn't shown, so it can't snowball.
+export function DownvoteButton({ photoId, slug, downvoted }: { photoId: string; slug: string; downvoted: boolean }) {
+  const [on, setOptimistic] = useOptimistic(downvoted);
+  const [, start] = useTransition();
+  return (
+    <button type="button" aria-pressed={on} aria-label={on ? "Undo thumbs down" : "Thumbs down"}
+      onClick={() => start(async () => { setOptimistic(!on); await toggleDownvote(photoId, slug); })}
+      className="drop-shadow">
+      <ThumbsDown className={`size-7 ${on ? "fill-white" : ""}`} strokeWidth={1.5} />
+    </button>
+  );
+}
+
+// Admins only. The first tap asks, the second removes, so a stray tap can't take a photo down.
+export function RemovePhotoButton({ photoId, slug }: { photoId: string; slug: string }) {
+  const [armed, setArmed] = useState(false);
+  const [pending, start] = useTransition();
+  useEffect(() => {
+    if (!armed) return;
+    const id = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(id);
+  }, [armed]);
+  return (
+    <button type="button" disabled={pending} aria-label={armed ? "Tap again to remove this photo" : "Remove photo"}
+      onClick={() => (armed ? start(() => removePhoto(photoId, slug)) : setArmed(true))}
+      className="relative drop-shadow">
+      <Trash2 className={`size-6 ${armed ? "text-alert" : ""}`} strokeWidth={1.5} />
+      {armed && (
+        <span className="absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-alert px-3 py-1 text-xs font-bold">
+          Tap again to remove
+        </span>
+      )}
     </button>
   );
 }

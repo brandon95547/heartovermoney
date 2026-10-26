@@ -1,18 +1,19 @@
 // The photo wall (screen design pages 6–9): one photo per screen, swiped vertically, with
-// likes, the poster's caption and the event's hashtags. Refreshes on its own so new photos
-// appear during an event. The Posts feed shows every event's photos, each linking to its
-// event; an event's own wall shows only that event's.
+// likes and thumbs-downs, the poster's caption and the event's hashtags. Refreshes on its own
+// so new photos appear during an event. The Posts feed shows every event's photos, each
+// linking to its event; an event's own wall shows only that event's. Admins can remove one.
 import Link from "next/link";
 import { Camera, ChevronLeft, ChevronRight, Share2 } from "lucide-react";
 import { ArtImage } from "@/components/art-image";
-import { AutoRefresh, LikeButton } from "@/components/event-client";
+import { AutoRefresh, DownvoteButton, LikeButton, RemovePhotoButton } from "@/components/event-client";
 import { Logo } from "@/components/logo";
 import type { listPhotos } from "@/lib/queries";
 
 type Photo = Awaited<ReturnType<typeof listPhotos>>[number];
 
-export function PhotoWall({ photos, back, postHref, showEvent = false }: {
+export function PhotoWall({ photos, viewer, back, postHref, showEvent = false }: {
   photos: Photo[];
+  viewer: { id: string; isAdmin: boolean } | null;
   back?: { href: string; label: string };
   postHref?: string;
   showEvent?: boolean;
@@ -35,7 +36,9 @@ export function PhotoWall({ photos, back, postHref, showEvent = false }: {
             </div>
             <div className="absolute left-4 top-36 flex flex-col items-center gap-6">
               <LikeButton photoId={p.id} slug={p.eventSlug} liked={p.liked} count={p.likes} />
+              {viewer?.id !== p.userId && <DownvoteButton photoId={p.id} slug={p.eventSlug} downvoted={p.downvoted} />}
               <a href={p.image} download aria-label="Download photo" className="drop-shadow"><Share2 className="size-7" strokeWidth={1.5} /></a>
+              {viewer?.isAdmin && <RemovePhotoButton photoId={p.id} slug={p.eventSlug} />}
             </div>
             <div className="absolute inset-x-0 bottom-20 px-5">
               <p className="text-lg font-bold">@{p.username}</p>

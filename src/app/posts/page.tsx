@@ -22,5 +22,5 @@ async function Feed() {
   const user = await getUser();
   const [photos, next] = await Promise.all([listPhotos(null, user?.id), getNextEvent()]);
   // New photos go to the event that is on now, or the next one.
-  return <PhotoWall photos={photos} postHref={next ? `/events/${next.slug}/photos/new` : undefined} showEvent />;
+  return <PhotoWall photos={photos} viewer={user && { id: user.id, isAdmin: user.role === "admin" }} postHref={next ? `/events/${next.slug}/photos/new` : undefined} showEvent />;
 }
