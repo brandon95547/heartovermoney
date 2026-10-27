@@ -29,23 +29,40 @@ Nothing is charged. Checkout, Buy Now, food orders and memberships are recorded 
 straight away, and every payment screen says so. Card payments (Stripe test mode first) come
 next.
 
+## Email
+
+Password resets and Contact messages send email through any SMTP provider: set `SMTP_URL`
+and `MAIL_FROM` (and `CONTACT_EMAIL` for where Contact messages go). Without `SMTP_URL`
+nothing is sent; the email is written to the server log instead, so on a machine without
+mail the reset link is in the log.
+
 ## What's in it
 
 | Area | Pages |
 | --- | --- |
-| Products | Home (`/`, open to everyone), artwork (`/art/[slug]`), cart and checkout, order confirmation |
-| Auctions | A lot (`/auction/[id]`): Buy Now before the event, then live bidding |
-| The next event | `/events`, the link on the cards handed out: sign in, pick the collector card you'll get at the door, the Joker's game, a line about yourself, then the door or the mail |
-| Events | Overview, Details (Tonight's Scoreboard), photo wall, posting a photo, food and drink |
+| Products | Home (`/`, open to everyone), artwork (`/art/[slug]`), artists with Follow (`/artists/[slug]`), collections (`/cities`, `/cities/[slug]`), cart and checkout, order confirmation |
+| Auctions | All lots by phase (`/auctions`), and a lot (`/auctions/[id]`): VIP early Buy Now before the event, then live bidding. `/auction/[id]` redirects there |
+| The next event | `/events`, the link on the cards handed out: sign in, pick the collector card you'll get at the door, the Joker's game (timed on the server), a line about yourself (with a VIP upgrade for non-VIPs), then the door or the mail, and a QR code for the door |
+| Events | Overview (with the contract's terms and documents), Details (Tonight's Scoreboard), photo wall (share, download), posting a photo, food and drink |
 | Posts | `/posts`: every event's photos, the Home of the Posts side. People can thumbs-down a photo (five take it off the wall); admins can remove one, and restore removed photos at `/admin/photos` |
-| Collecting | Vault, certificates of authenticity with a QR code (`/certificates/[code]`), city collections |
-| Account | Sign in and up, Profile, Settings, Membership tiers, Search |
+| Collecting | Vault, certificates of authenticity (`/certificates/[code]`): a public check that a piece is genuine, with its ownership record; the owner's name shows only to the owner |
+| Stories | Films (`/films`, `/films/[slug]`), The mission, About, Contact |
+| Account | Sign in and up, Forgot details (`/reset-password`), Profile, My cards (`/profile/cards`), Settings (shipping address, email updates, password), Membership, Search with filters |
+| Staff | Door check-in (`/admin/check-in`): scan a guest's QR, hand over the card. Removed photos (`/admin/photos`) |
 | Later | Chat (the Connections Messenger) has a placeholder page |
 
+Navigation: the bottom bar is icons only, as in the designs (Posts side: ♥ and Chat;
+Products side: $ and Cart; the center opens Vault, Posts, Products and Settings). ☰ on the
+Products home and the Posts feed opens the site menu (Collections, Auctions, Membership, the
+next event, Posts, Films, The mission, About, Contact).
+
 One event runs at a time; `/events` always means the next one. Any membership (from $25 a
-month) makes someone a VIP, and only VIPs can buy fine art (prints and founders' art) or take
-part in the auction; merch and shoes are open to everyone. The 700 Club is $77 a month, with
-700 seats. A 700 Club member who owns more than one fine art piece is a Super Optimistic VIP.
+month) makes someone a VIP. Only VIPs can buy fine art (prints and founders' art); a guest who
+taps Buy is sent to sign in, and a member to Membership, and both come back to the piece.
+Merch, shoes and food are open to everyone. Auction lots: Buy Now before the event is a VIP
+early deal; at the live auction anyone signed in can bid, except on art lots (`lots.is_art`),
+which stay VIP-only. The 700 Club is $77 a month, with 700 seats. A 700 Club member who owns
+more than one fine art piece is a Super Optimistic VIP.
 
 Certificate IDs follow the business plan: `TITLE_NUMBER/EDITION_CITY-ST_MM.DD.YYYY-ARTIST`.
 
@@ -94,6 +111,14 @@ boundary (Next.js Cache Components), so run it before pushing.
 
 ## Open questions
 
-The client has answered most of the first questions. Still open: who counts as a Founding
-Collector, and how certificates track ownership through resale. The card faces are stand-ins
-until the real designs arrive.
+The client has answered most of the first questions. Still open:
+
+- Founding Collector: the call notes say anyone who gives any amount; the business plan
+  (page 55) says anyone who owns Year 1 artwork.
+- Resale: every numbered piece keeps an ownership record (`provenance`) from its first sale,
+  so its history can follow it, but how transfers between collectors work isn't decided.
+- Bidding: the overview says everyone bids at the live auction and the client says art is
+  VIP-only; the site does both (art lots VIP-only), pending his confirmation.
+- The card faces and the film posters are stand-ins until the real designs and films arrive.
+- An admin panel for art, editions, cards, events, orders, memberships, auctions and content
+  (so the team can run the site without database edits) is the next piece of work.

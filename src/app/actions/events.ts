@@ -11,19 +11,19 @@ import { z } from "zod";
 import { db, schema as s } from "@/db";
 import { CARD_DESIGNS, type CardDesign } from "@/lib/cards";
 import { getUser } from "@/lib/dal";
+import { checkInQr } from "@/lib/check-in";
 import { UPLOAD_DIR, uploadPath } from "@/lib/uploads";
 
 export type EventActionState = { error?: string } | undefined;
 
 export type RegistrationState = {
   error?: string;
-  done?: { design: CardDesign; jokerChoice: "kept" | "gift_card" | null; ship: boolean; slug: string };
+  done?: { design: CardDesign; jokerChoice: "kept" | "gift_card" | null; ship: boolean; slug: string; code: string; qr: string };
 } | undefined;
 
 const Registration = z.object({
   eventId: z.uuid(),
   favorite: z.enum(["joker", "queen", "rabbit"]),
-  jokerChoice: z.enum(["kept", "gift_card", ""]),
   tagline: z.string().trim().max(80),
   fulfillment: z.enum(["pickup", "ship"]),
   address: z.string().trim().max(300),
@@ -31,31 +31,71 @@ const Registration = z.object({
 
 class RegistrationError extends Error {}
 
-// Reserves one card of the design picked, for the door or the mail. A Joker that ran out of
-// time before a choice is kept.
+// The Joker's two minutes, timed on the server (joker_timers): the clock starts the first
+// time the guest reaches the Joker's step and never restarts, and only a choice recorded
+// before it runs out counts. Otherwise the Joker is kept.
+const JOKER_MS = 120_000;
+const JOKER_GRACE_MS = 3_000; // the request's own travel time
+type JokerChoice = "kept" | "gift_card";
+
+async function jokerTimer(eventId: string, userId: string) {
+  const [row] = await db.select().from(s.jokerTimers)
+    .where(and(eq(s.jokerTimers.eventId, eventId), eq(s.jokerTimers.userId, userId))).limit(1);
+  return row ?? null;
+}
+
+// Starts the clock (or finds it running). Returns when it ends and the server's time now, so
+// the page can count down without trusting the phone's clock.
+export async function startJokerTimer(eventId: string): Promise<{ deadline: number; now: number; choice: JokerChoice | null } | null> {
+  const user = await getUser();
+  if (!user || !isId(eventId)) return null;
+  await db.insert(s.jokerTimers).values({ eventId, userId: user.id }).onConflictDoNothing();
+  const timer = await jokerTimer(eventId, user.id);
+  if (!timer) return null;
+  return { deadline: timer.startedAt.getTime() + JOKER_MS, now: Date.now(), choice: timer.choice };
+}
+
+// Records the choice if the clock is still running; once it has run out, the Joker is kept.
+export async function chooseJoker(eventId: string, choice: JokerChoice): Promise<{ choice: JokerChoice; late: boolean }> {
+  const user = await getUser();
+  if (!user || !isId(eventId) || (choice !== "kept" && choice !== "gift_card")) return { choice: "kept", late: true };
+  const timer = await jokerTimer(eventId, user.id);
+  const where = and(eq(s.jokerTimers.eventId, eventId), eq(s.jokerTimers.userId, user.id));
+  if (!timer || Date.now() > timer.startedAt.getTime() + JOKER_MS + JOKER_GRACE_MS) {
+    if (timer && !timer.choice) await db.update(s.jokerTimers).set({ choice: "kept", chosenAt: new Date() }).where(where);
+    return { choice: timer?.choice ?? "kept", late: true };
+  }
+  await db.update(s.jokerTimers).set({ choice, chosenAt: new Date() }).where(where);
+  return { choice, late: false };
+}
+
+// Reserves one card of the design picked, for the door or the mail. The Joker's outcome is
+// what the server recorded while its clock ran; with nothing recorded, the Joker is kept.
 export async function registerForEvent(_: RegistrationState, form: FormData): Promise<RegistrationState> {
   const user = await getUser();
   if (!user) redirect("/signin?next=/events");
-  const fields = ["eventId", "favorite", "jokerChoice", "tagline", "fulfillment", "address"];
+  const fields = ["eventId", "favorite", "tagline", "fulfillment", "address"];
   const parsed = Registration.safeParse(Object.fromEntries(fields.map((k) => [k, form.get(k) ?? ""])));
   if (!parsed.success) return { error: "Pick a card first." };
   const { eventId, favorite, tagline, fulfillment, address } = parsed.data;
   const ship = fulfillment === "ship";
   if (ship && address.length < 10) return { error: "Enter the full shipping address." };
-  const jokerChoice = favorite === "joker" ? parsed.data.jokerChoice || "kept" : null;
+  const jokerChoice = favorite === "joker" ? (await jokerTimer(eventId, user.id))?.choice ?? "kept" : null;
 
   const [event] = await db.select({ slug: s.events.slug }).from(s.events).where(eq(s.events.id, eventId)).limit(1);
   if (!event) return { error: "That event no longer exists." };
+  let code = "";
   try {
     await db.transaction(async (tx) => {
       const [taken] = await tx.select({ id: s.registrations.id }).from(s.registrations)
         .where(and(eq(s.registrations.eventId, eventId), eq(s.registrations.userId, user.id))).limit(1);
       if (taken) throw new RegistrationError("You're already registered for this event.");
-      const [card] = await tx.select({ id: s.cards.id }).from(s.cards)
+      const [card] = await tx.select({ id: s.cards.id, code: s.cards.code }).from(s.cards)
         .where(and(eq(s.cards.eventId, eventId), eq(s.cards.design, favorite),
           sql`not exists (select 1 from ${s.registrations} where ${s.registrations.cardId} = ${s.cards.id})`))
         .limit(1).for("update", { skipLocked: true });
       if (!card) throw new RegistrationError(`The last ${CARD_DESIGNS[favorite].name} was just claimed. Go back and pick another card.`);
+      code = card.code;
       await tx.insert(s.registrations).values({
         eventId, userId: user.id, cardId: card.id, jokerChoice, fulfillment, shipAddress: ship ? address : null,
       });
@@ -69,7 +109,7 @@ export async function registerForEvent(_: RegistrationState, form: FormData): Pr
   }
   // No revalidation: it would re-render /events, which sends someone registered on to the
   // event before they see this result. The event's pages read fresh on every visit.
-  return { done: { design: favorite, jokerChoice, ship, slug: event.slug } };
+  return { done: { design: favorite, jokerChoice, ship, slug: event.slug, code, qr: await checkInQr(code) } };
 }
 
 // Photo IDs come from the page; anything that isn't one is ignored rather than queried.
@@ -195,4 +235,17 @@ export async function orderFood(_: EventActionState, form: FormData): Promise<Ev
     orderId: order.id, label: i.name, menuItemId: i.id, quantity: wanted.get(i.id)!, unitPriceCents: i.priceCents,
   })));
   redirect(`/orders/${order.id}`);
+}
+
+// At the door: staff (admins) mark a guest's collector card as handed over.
+export async function checkInCard(form: FormData) {
+  const user = await getUser();
+  if (user?.role !== "admin") return;
+  const code = String(form.get("code") ?? "").trim().toUpperCase();
+  const [card] = await db.select({ id: s.cards.id }).from(s.cards).where(eq(s.cards.code, code)).limit(1);
+  if (!card) return;
+  await db.update(s.registrations).set({ checkedInAt: new Date() })
+    .where(and(eq(s.registrations.cardId, card.id), isNull(s.registrations.checkedInAt)));
+  revalidatePath("/admin/check-in");
+  redirect(`/admin/check-in?code=${encodeURIComponent(code)}`);
 }

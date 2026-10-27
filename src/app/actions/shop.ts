@@ -13,7 +13,11 @@ import { needsVip } from "@/lib/membership";
 export type ActionState = { error?: string; ok?: string } | undefined;
 
 const VIP_ONLY = "Art is for VIP members. Become a VIP from $25 a month.";
-const AUCTION_VIP_ONLY = "The auction is for VIP members. Become a VIP from $25 a month.";
+// The auction's rules (development overview page 6, and the client's "art is VIP only"): Buy
+// Now before the event is an early deal for VIPs; at the live auction anyone signed in can bid,
+// except on art, which stays VIP-only.
+const EARLY_VIP_ONLY = "Buy Now before the event is an early deal for VIP members. Become a VIP from $25 a month.";
+const ART_LOT_VIP_ONLY = "Art lots are for VIP members. Become a VIP from $25 a month.";
 
 async function signedIn(next: string) {
   const user = await getUser();
@@ -81,10 +85,12 @@ export async function checkout(_: ActionState, form: FormData): Promise<ActionSt
         const issuedAt = new Date();
         for (let k = 1; k <= i.quantity; k++) {
           const number = n + k;
-          await tx.insert(s.editions).values({
+          const [edition] = await tx.insert(s.editions).values({
             artworkId: i.artworkId, number, ownerId: user.id, orderId: order.id, issuedAt,
             certificateCode: certificateCode({ title: i.title, number, editionSize: i.editionSize, city: i.cityName, state: i.cityState, issuedAt, artistPrefix: i.prefix }),
-          });
+          }).returning({ id: s.editions.id });
+          // The first line of the piece's ownership record.
+          await tx.insert(s.provenance).values({ editionId: edition.id, kind: "issued", toUserId: user.id, at: issuedAt });
         }
       }
       await tx.delete(s.cartItems).where(eq(s.cartItems.userId, user.id));
@@ -101,8 +107,8 @@ class CheckoutError extends Error {}
 
 export async function buyNow(_: ActionState, form: FormData): Promise<ActionState> {
   const lotId = String(form.get("lotId") ?? "");
-  const user = await signedIn(`/auction/${lotId}`);
-  if (!user.isVip) return { error: AUCTION_VIP_ONLY };
+  const user = await signedIn(`/auctions/${lotId}`);
+  if (!user.isVip) return { error: EARLY_VIP_ONLY };
   const now = new Date();
   let orderId: string;
   try {
@@ -130,8 +136,7 @@ const minIncrement = (cents: number) => (cents < 100_000 ? 2_500 : 5_000);
 
 export async function placeBid(_: ActionState, form: FormData): Promise<ActionState> {
   const lotId = String(form.get("lotId") ?? "");
-  const user = await signedIn(`/auction/${lotId}`);
-  if (!user.isVip) return { error: AUCTION_VIP_ONLY };
+  const user = await signedIn(`/auctions/${lotId}`);
   const amountCents = Math.round(Number(form.get("amount")) * 100);
   if (!Number.isFinite(amountCents) || amountCents <= 0) return { error: "Enter a bid amount." };
   const now = new Date();
@@ -140,6 +145,7 @@ export async function placeBid(_: ActionState, form: FormData): Promise<ActionSt
       await tx.execute(sql`select id from ${s.lots} where id = ${lotId} for update`);
       const [lot] = await tx.select().from(s.lots).where(eq(s.lots.id, lotId)).limit(1);
       if (!lot || lot.status !== "open") throw new CheckoutError("Bidding on this lot has closed.");
+      if (lot.isArt && !user.isVip) throw new CheckoutError(ART_LOT_VIP_ONLY);
       if (now < lot.auctionStartsAt) throw new CheckoutError("Bidding opens when the live auction starts at the event.");
       if (now > lot.auctionEndsAt) throw new CheckoutError("Bidding on this lot has closed.");
       const [{ top }] = await tx.select({ top: sql<number | null>`max(${s.bids.amountCents})` }).from(s.bids).where(eq(s.bids.lotId, lotId));
@@ -151,6 +157,7 @@ export async function placeBid(_: ActionState, form: FormData): Promise<ActionSt
     if (err instanceof CheckoutError) return { error: err.message };
     throw err;
   }
-  revalidatePath(`/auction/${lotId}`);
+  revalidatePath(`/auctions/${lotId}`);
+  revalidatePath("/auctions");
   return { ok: "Your bid is in. You're the highest bidder." };
 }

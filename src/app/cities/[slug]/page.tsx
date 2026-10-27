@@ -1,12 +1,13 @@
 // A city's permanent story page: where its collection came from. Certificates' QR codes
 // lead here.
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { Music } from "lucide-react";
+import { Music, Play } from "lucide-react";
 import { ArtImage } from "@/components/art-image";
 import { ArtworkCard } from "@/components/cards";
 import { Empty, PageHeader, SectionLabel, Skeleton } from "@/components/ui";
-import { getCity, listArtworks } from "@/lib/queries";
+import { filmForCity, getCity, listArtworks } from "@/lib/queries";
 
 export default function CityPage(props: PageProps<"/cities/[slug]">) {
   return (
@@ -21,7 +22,7 @@ async function City({ params }: { params: PageProps<"/cities/[slug]">["params"] 
   const { slug } = await params;
   const city = await getCity(slug);
   if (!city) notFound();
-  const works = await listArtworks({ citySlug: slug });
+  const [works, film] = await Promise.all([listArtworks({ citySlug: slug }), filmForCity(slug)]);
   return (
     <article>
       <div className="relative aspect-[16/10] bg-mist">
@@ -37,7 +38,11 @@ async function City({ params }: { params: PageProps<"/cities/[slug]">["params"] 
         {city.songTitle && (
           <p className="flex items-center gap-3 rounded-md bg-fog p-4 text-sm"><Music className="size-5" strokeWidth={1.5} /> Song: <b>{city.songTitle}</b></p>
         )}
-        {city.videoUrl && <a href={city.videoUrl} className="block text-sm font-semibold underline">Watch the music video</a>}
+        {film && (
+          <Link href={`/films/${film.slug}`} className="flex items-center gap-3 rounded-md border border-line p-4 text-sm">
+            <Play className="size-5" strokeWidth={1.5} /> Watch <b>{film.title}</b>
+          </Link>
+        )}
         <section>
           <SectionLabel className="mb-3">The {city.name} collection</SectionLabel>
           {works.length ? (

@@ -19,6 +19,7 @@ export function ArtworkCard({ a, wide = false }: { a: Artwork; wide?: boolean })
       <p className="mt-2 truncate text-sm">{a.artistName}</p>
       <p className="truncate text-xs text-muted">{a.title}</p>
       <p className="text-sm font-semibold">{money(a.priceCents)}</p>
+      {wide && !soldOut && <p className="text-[11px] text-muted">{a.editionSize - a.sold} of {a.editionSize} left</p>}
     </Link>
   );
 }
@@ -31,7 +32,7 @@ type Lot = {
 export function LotCard({ l, now }: { l: Lot; now: Date }) {
   const current = l.topBidCents ?? l.startingBidCents;
   return (
-    <Link href={`/auction/${l.id}`} className="group block w-40 shrink-0 snap-start">
+    <Link href={`/auctions/${l.id}`} className="group block w-40 shrink-0 snap-start">
       <div className="relative aspect-square overflow-hidden rounded-sm bg-mist">
         <ArtImage src={l.images[0]} alt={l.title} sizes="160px" className="transition-transform group-hover:scale-105" />
         <span className="absolute bottom-2 left-2 rounded bg-paper/90 px-2 py-0.5 text-[10px] font-semibold text-alert">

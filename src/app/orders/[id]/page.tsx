@@ -73,7 +73,11 @@ async function Order({ params }: { params: PageProps<"/orders/[id]">["params"] }
       )}
       {order.kind === "art" ? <Link href="/vault" className={buttonClass("outline", "w-full")}>Open your Vault</Link>
         : event ? <Link href={`/events/${event.slug}`} className={buttonClass("outline", "w-full")}>Back to the event</Link>
-        : <Link href="/profile" className={buttonClass("outline", "w-full")}>Your orders</Link>}
+        : <Link href="/profile#orders" className={buttonClass("outline", "w-full")}>Your orders</Link>}
+      <div className="flex justify-center gap-6 text-sm font-semibold">
+        <Link href="/profile#orders" className="underline">All your orders</Link>
+        <Link href="/" className="underline">Continue shopping</Link>
+      </div>
     </div>
   );
 }

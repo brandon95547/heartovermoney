@@ -41,7 +41,7 @@ async function Cart() {
               <ArtImage src={i.images[0]} alt={i.title} sizes="80px" />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold">{i.title}</p>
+              <Link href={`/art/${i.slug}`} className="block truncate font-semibold">{i.title}</Link>
               <p className="text-xs text-muted">by {i.artistName} · {Math.max(0, i.editionSize - i.sold)} left</p>
               <p className="mt-1 text-sm font-semibold">{money(i.priceCents * i.quantity)}</p>
             </div>
@@ -57,7 +57,8 @@ async function Cart() {
       <div className="flex justify-between border-t border-line pt-4 text-lg font-bold">
         <span>Total</span><span>{money(total, { cents: true })}</span>
       </div>
-      <CheckoutForm totalLabel={money(total)} />
+      <CheckoutForm totalLabel={money(total)} defaultAddress={user.shipAddress ?? ""} />
+      <Link href="/" className="block text-center text-sm font-semibold underline">Continue shopping</Link>
     </div>
   );
 }

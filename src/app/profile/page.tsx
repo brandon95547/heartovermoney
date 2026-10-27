@@ -12,21 +12,21 @@ import { listOrders, listVault } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Profile" };
 
-export default function ProfilePage() {
+export default function ProfilePage(props: PageProps<"/profile">) {
   return (
     <main>
       <PageHeader title="Profile" />
-      <Suspense fallback={<Skeleton className="m-5 h-80" />}><Profile /></Suspense>
+      <Suspense fallback={<Skeleton className="m-5 h-80" />}><Profile searchParams={props.searchParams} /></Suspense>
     </main>
   );
 }
 
-async function Profile() {
-  const user = await getUser();
+async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["searchParams"] }) {
+  const [user, sp] = await Promise.all([getUser(), searchParams]);
   if (!user) {
     return (
       <div className="flex flex-col items-center gap-6 px-8 py-16 text-center">
-        <Logo size={64} />
+        <Logo size={76} />
         <p className="text-sm text-muted">Sign in to see your collection, orders and membership.</p>
         <Link href="/signin?next=/profile" className={buttonClass("black", "w-full")}>Sign in</Link>
         <Link href="/signup?next=/profile" className={buttonClass("outline", "w-full")}>Create account</Link>
@@ -43,6 +43,7 @@ async function Profile() {
   );
   return (
     <div className="space-y-6 p-5">
+      {sp.reset && <p role="status" className="rounded-md bg-go/10 p-3 text-sm text-go">Your new password is set, and you&apos;re signed in.</p>}
       <div className="flex items-center gap-4">
         <span className="flex size-14 items-center justify-center rounded-full bg-ink text-xl font-bold text-white">{user.displayName[0]}</span>
         <div>
@@ -57,13 +58,15 @@ async function Profile() {
       </div>
       <nav className="divide-y divide-line border-y border-line">
         {link("/vault", "Vault", "Your collection")}
+        {link("/profile/cards", "My cards", "Collector cards")}
         {link("/membership", "Membership", tier ? tier.name : "Join")}
         {link("/events", "The next event")}
         {link("/settings", "Settings")}
-        {user.role === "admin" && link("/admin/photos", "Removed photos")}
+        {user.role === "admin" && link("/admin/check-in", "Door check-in", "Admin")}
+        {user.role === "admin" && link("/admin/photos", "Removed photos", "Admin")}
       </nav>
       <section>
-        <SectionLabel className="mb-2">Orders</SectionLabel>
+        <SectionLabel className="mb-2"><span id="orders">Orders</span></SectionLabel>
         {orders.length ? (
           <ul className="divide-y divide-line">
             {orders.map((o) => (

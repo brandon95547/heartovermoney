@@ -4,11 +4,12 @@
 // of October 2026). Pick the collector card you'll get at the door, from the designs with
 // cards left. Draw the Joker and you have two minutes to choose between a guaranteed $20 gift
 // card and keeping it, not knowing that keeping it means VIP access at the event. Then a line
-// about yourself, and the door or the mail.
+// about yourself (with the VIP upgrade for anyone who isn't one), and the door or the mail.
+// The Joker's clock and choice are kept on the server, so reloading can't restart it.
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { registerForEvent, type RegistrationState } from "@/app/actions/events";
+import { chooseJoker, registerForEvent, startJokerTimer, type RegistrationState } from "@/app/actions/events";
 import { buttonClass } from "@/components/ui";
 import { CARD_DESIGNS, type CardDesign } from "@/lib/cards";
 
@@ -27,7 +28,7 @@ function Card({ design, selected, onSelect }: { design: CardDesign; selected: bo
   );
 }
 
-// Two minutes from when the Joker's step first opens; going back and forth doesn't reset it.
+// Counts down to the server's deadline (already shifted onto this phone's clock).
 function Countdown({ deadline, onExpire }: { deadline: number; onExpire: () => void }) {
   const [left, setLeft] = useState(() => Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
   useEffect(() => {
@@ -41,14 +42,16 @@ function Countdown({ deadline, onExpire }: { deadline: number; onExpire: () => v
   return <span className="font-mono text-5xl font-bold tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</span>;
 }
 
-export function CardProcess({ event, options, tagline: savedTagline, vipMember }: {
-  event: { id: string; title: string; place: string; when: string };
+export function CardProcess({ event, options, tagline: savedTagline, shipAddress, vipMember }: {
+  event: { id: string; slug: string; title: string; place: string; when: string };
   options: CardDesign[];
   tagline: string;
+  shipAddress: string;
   vipMember: boolean;
 }) {
   const [favorite, setFavorite] = useState<CardDesign | null>(null);
   const [jokerChoice, setJokerChoice] = useState<JokerChoice | null>(null);
+  const [jokerLate, setJokerLate] = useState(false);
   const [jokerDeadline, setJokerDeadline] = useState<number | null>(null);
   const [tagline, setTagline] = useState(savedTagline);
   const [ship, setShip] = useState(false);
@@ -60,9 +63,19 @@ export function CardProcess({ event, options, tagline: savedTagline, vipMember }
   const canGoOn = step === "favorite" ? !!favorite : step === "joker" ? !!jokerChoice : step === "about";
 
   const pick = (d: CardDesign) => { setFavorite(d); if (d !== "joker") setJokerChoice(null); };
-  const next = () => {
-    if (steps[index + 1] === "joker" && jokerDeadline === null) setJokerDeadline(Date.now() + 120_000);
+  const next = async () => {
+    if (steps[index + 1] === "joker" && jokerDeadline === null) {
+      const timer = await startJokerTimer(event.id);
+      // The server's deadline, moved onto this phone's clock.
+      setJokerDeadline(timer ? Date.now() + (timer.deadline - timer.now) : Date.now());
+      if (timer?.choice) setJokerChoice(timer.choice);
+    }
     setIndex((i) => i + 1);
+  };
+  const choose = async (c: JokerChoice) => {
+    const result = await chooseJoker(event.id, c);
+    setJokerChoice(result.choice);
+    setJokerLate(result.late);
   };
 
   if (state?.done) return <Done {...state.done} event={event} vipMember={vipMember} />;
@@ -81,7 +94,6 @@ export function CardProcess({ event, options, tagline: savedTagline, vipMember }
     <form action={action} className="flex flex-1 flex-col px-6 pb-8">
       <input type="hidden" name="eventId" value={event.id} />
       <input type="hidden" name="favorite" value={favorite ?? ""} />
-      <input type="hidden" name="jokerChoice" value={jokerChoice ?? ""} />
       <input type="hidden" name="tagline" value={tagline} />
       <input type="hidden" name="fulfillment" value={ship ? "ship" : "pickup"} />
 
@@ -104,18 +116,18 @@ export function CardProcess({ event, options, tagline: savedTagline, vipMember }
             <h1 className="text-center text-2xl font-bold uppercase">We all play a game of chance</h1>
             {jokerChoice ? (
               <p className="text-center text-lg font-semibold">
-                {jokerChoice === "kept" ? "You're keeping the Joker." : "You're taking the $20 gift card."}
+                {jokerLate ? "Time ran out, so you're keeping the Joker." : jokerChoice === "kept" ? "You're keeping the Joker." : "You're taking the $20 gift card."}
               </p>
             ) : (
               <div className="flex flex-col items-center gap-4 text-center">
                 <p className="text-sm">You drew the Joker. Decide before the clock runs out.</p>
-                {jokerDeadline !== null && <Countdown deadline={jokerDeadline} onExpire={() => setJokerChoice((c) => c ?? "kept")} />}
-                <button type="button" onClick={() => setJokerChoice("gift_card")} className={buttonClass("outline", "w-full border-white text-white hover:bg-white/10")}>
+                {jokerDeadline !== null && <Countdown deadline={jokerDeadline} onExpire={() => { setJokerChoice((c) => c ?? "kept"); setJokerLate(true); }} />}
+                <button type="button" onClick={() => choose("gift_card")} className={buttonClass("outline", "w-full border-white text-white hover:bg-white/10")}>
                   Redeem it for a $20 gift card
                 </button>
                 <p className="-mt-2 text-xs text-white/70">Guaranteed, to spend at the event.</p>
                 {/* The two look alike on purpose: nothing should hint that keeping it is better. */}
-                <button type="button" onClick={() => setJokerChoice("kept")} className={buttonClass("outline", "w-full border-white text-white hover:bg-white/10")}>
+                <button type="button" onClick={() => choose("kept")} className={buttonClass("outline", "w-full border-white text-white hover:bg-white/10")}>
                   Keep the Joker
                 </button>
               </div>
@@ -125,9 +137,17 @@ export function CardProcess({ event, options, tagline: savedTagline, vipMember }
         {step === "about" && (
           <>
             <h1 className="text-center text-2xl font-bold uppercase">Tell us about yourself</h1>
-            <p className="text-center text-sm text-white/80">Other guests see this on your name tag and in the attendee list.</p>
+            <p className="text-center text-sm text-white/80">A line about you, shown with your name to the other guests.</p>
             <input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={80} placeholder="e.g. joyful enthusiast" aria-label="About you"
               className="h-14 w-full rounded-md bg-white px-5 text-ink outline-none" />
+            {!vipMember && (
+              <div className="rounded-md border border-white/40 p-4 text-sm">
+                <p className="mb-1 text-xs font-bold uppercase tracking-widest">VIP upgrade</p>
+                <p className="text-white/80">Any membership from $25 a month makes you a VIP: buy the limited-edition art before the event, and take the auction&apos;s early Buy Now deals.</p>
+                {/* A new tab, so the card picked here isn't lost. */}
+                <a href="/membership" target="_blank" rel="noopener" className="mt-2 inline-block font-semibold underline">See memberships</a>
+              </div>
+            )}
           </>
         )}
         {step === "claim" && (
@@ -141,7 +161,10 @@ export function CardProcess({ event, options, tagline: savedTagline, vipMember }
                 </button>
               ))}
             </div>
-            {ship && <textarea name="address" rows={3} placeholder="Shipping address" className="w-full rounded-md bg-white p-4 text-sm text-ink outline-none" />}
+            {ship && <textarea name="address" rows={3} defaultValue={shipAddress} placeholder="Shipping address" className="w-full rounded-md bg-white p-4 text-sm text-ink outline-none" />}
+            <p className="text-center text-xs text-white/70">
+              Registering means you agree to <a href={`/events/${event.slug}#terms`} target="_blank" rel="noopener" className="underline">the event&apos;s terms</a>.
+            </p>
             {state?.error && <p role="alert" className="text-center text-sm text-[#ff8a80]">{state.error}</p>}
             <button disabled={pending} className={buttonClass("outline", "border-white text-white hover:bg-white/10")}>
               {pending ? "Saving…" : "Finish"}
@@ -163,19 +186,29 @@ export function CardProcess({ event, options, tagline: savedTagline, vipMember }
   );
 }
 
-function Done({ design, jokerChoice, ship, slug, event, vipMember }: NonNullable<NonNullable<RegistrationState>["done"]> & {
+function Done({ design, jokerChoice, ship, slug, code, qr, event, vipMember }: NonNullable<NonNullable<RegistrationState>["done"]> & {
   event: { title: string; place: string; when: string };
   vipMember: boolean;
 }) {
   const name = CARD_DESIGNS[design].name;
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-5 px-8 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-5 overflow-y-auto px-8 py-6 text-center">
       <p className="text-2xl font-bold">You&apos;re registered.</p>
       <p className="text-sm text-white/80">{event.title} · {event.place} · {event.when}</p>
       <p>{ship ? `We'll mail your ${name} card.` : `Your ${name} card is waiting for you at the door.`}</p>
       {jokerChoice === "kept" && <p className="font-semibold">You kept the Joker. That means VIP access at the event.</p>}
       {jokerChoice === "gift_card" && <p className="font-semibold">Your $20 gift card is ready to spend at the event.</p>}
-      <Link href={`/events/${slug}`} className={buttonClass("outline", "border-white text-white hover:bg-white/10")}>See the event</Link>
+      {!ship && (
+        <div className="rounded-md bg-white p-4 text-ink">
+          <span className="block" dangerouslySetInnerHTML={{ __html: qr }} role="img" aria-label={`Check-in code ${code}`} />
+          <p className="mt-2 font-mono text-sm font-bold">{code}</p>
+          <p className="text-xs text-muted">Show this at the door. It&apos;s also in My Cards.</p>
+        </div>
+      )}
+      <div className="flex w-full flex-col gap-3">
+        <Link href={`/events/${slug}`} className={buttonClass("outline", "border-white text-white hover:bg-white/10")}>See the event</Link>
+        <Link href="/profile/cards" className="text-sm font-semibold underline">My cards</Link>
+      </div>
       {!vipMember && (
         <p className="text-xs text-white/70">
           Art is for VIP members. <Link href="/membership" className="font-semibold underline">Become a VIP</Link> from $25 a month.

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { addToCart, buyNow, checkout, placeBid, type ActionState } from "@/app/actions/shop";
 import { buttonClass } from "@/components/ui";
+import { withNext } from "@/lib/next-path";
 
 function Message({ state }: { state: ActionState }) {
   if (state?.error) return <p role="alert" className="mt-2 text-sm text-alert">{state.error}</p>;
@@ -13,14 +14,20 @@ function Message({ state }: { state: ActionState }) {
   return null;
 }
 
-// `vipOnly`: the piece is art and the visitor isn't a VIP, so it points to Membership instead.
-export function AddToCart({ slug, soldOut, vipOnly = false }: { slug: string; soldOut: boolean; vipOnly?: boolean }) {
+// `gate`: the piece is art, which only VIPs can buy. A visitor who isn't signed in is sent to
+// sign in first, and a member who isn't a VIP to Membership; either way they come back here.
+export function AddToCart({ slug, soldOut, gate }: { slug: string; soldOut: boolean; gate?: "signin" | "vip" }) {
   const [state, action, pending] = useActionState(addToCart, undefined);
-  if (vipOnly && !soldOut) {
+  if (gate && !soldOut) {
+    const back = `/art/${slug}`;
     return (
       <div>
-        <Link href="/membership" className={buttonClass("primary", "w-52")}>VIP members only</Link>
-        <p className="mt-2 text-sm text-muted">Art is for VIP members. Membership starts at $25 a month.</p>
+        {gate === "signin"
+          ? <Link href={withNext("/signin", back)} className={buttonClass("primary", "w-52")}>Sign in to buy</Link>
+          : <Link href={withNext("/membership", back)} className={buttonClass("primary", "w-52")}>Become a VIP to buy</Link>}
+        <p className="mt-2 text-sm text-muted">
+          Art is for VIP members. {gate === "signin" ? "Sign in, or create an account, then choose a membership from $25 a month." : "Membership starts at $25 a month, and brings you back here."}
+        </p>
       </div>
     );
   }
@@ -72,7 +79,7 @@ export function LotActions({ lotId, canBuyNow, canBid, minBidDollars, buyNowLabe
   );
 }
 
-export function CheckoutForm({ totalLabel }: { totalLabel: string }) {
+export function CheckoutForm({ totalLabel, defaultAddress }: { totalLabel: string; defaultAddress: string }) {
   const [state, action, pending] = useActionState(checkout, undefined);
   const [ship, setShip] = useState(false);
   return (
@@ -89,7 +96,7 @@ export function CheckoutForm({ totalLabel }: { totalLabel: string }) {
       {ship && (
         <label className="block">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted">Shipping address</span>
-          <textarea name="address" rows={3} required className="w-full rounded-md bg-fog p-4 text-sm outline-none focus:ring-2 focus:ring-ink/20" />
+          <textarea name="address" rows={3} required defaultValue={defaultAddress} className="w-full rounded-md bg-fog p-4 text-sm outline-none focus:ring-2 focus:ring-ink/20" />
         </label>
       )}
       <Message state={state} />

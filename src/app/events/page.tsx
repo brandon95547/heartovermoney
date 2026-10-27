@@ -38,7 +38,7 @@ async function Registration() {
   const options = await listCardOptions(event.id);
   return (
     <CardProcess
-      event={{ id: event.id, title: event.title, place: `${event.cityName}, ${event.cityState}`, when: eventDate(event.startsAt) }}
-      options={options.map((o) => o.design)} tagline={user.tagline ?? ""} vipMember={user.isVip} />
+      event={{ id: event.id, slug: event.slug, title: event.title, place: `${event.cityName}, ${event.cityState}`, when: eventDate(event.startsAt) }}
+      options={options.map((o) => o.design)} tagline={user.tagline ?? ""} shipAddress={user.shipAddress ?? ""} vipMember={user.isVip} />
   );
 }

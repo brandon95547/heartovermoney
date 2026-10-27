@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Check } from "lucide-react";
 import { signIn, signUp, type AuthState } from "@/app/actions/auth";
 import { Field, buttonClass } from "@/components/ui";
 
@@ -25,6 +26,22 @@ function FormError({ state }: { state: AuthState }) {
   return state?.error ? <p role="alert" className="text-center text-sm text-alert">{state.error}</p> : null;
 }
 
+// The email field of the design, with its green check once the address looks complete.
+function EmailField({ defaultValue }: { defaultValue?: string }) {
+  const [value, setValue] = useState(defaultValue ?? "");
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
+  return (
+    <div className="relative">
+      <Field label="Email" name="email" type="email" autoComplete="email" required value={value} onChange={(e) => setValue(e.target.value)} />
+      {valid && (
+        <span aria-hidden className="absolute inset-y-0 right-4 my-auto flex size-7 items-center justify-center rounded-md bg-gradient-to-b from-[#7fd58b] to-[#4fba5f] text-ink">
+          <Check className="size-4" strokeWidth={2.5} />
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Shown when the link on a card (heartovermoney.com/events) sent the visitor here.
 function ForTheEvent({ next }: { next: string }) {
   return next === "/events" ? <p className="text-center text-sm">Sign in or create an account to get your card for the next event.</p> : null;
@@ -37,12 +54,13 @@ export function SignInForm() {
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
       <ForTheEvent next={next} />
-      <Field label="Email" name="email" type="email" autoComplete="email" required defaultValue={state?.fields?.email} />
+      <EmailField key={state?.fields?.email} defaultValue={state?.fields?.email} />
       <PasswordField autoComplete="current-password" />
       <FormError state={state} />
       <button disabled={pending} className={buttonClass("black", "w-full tracking-[0.2em] uppercase")}>
         {pending ? "Signing in…" : "Sign in"}
       </button>
+      <p className="text-center"><Link href="/reset-password" className="text-xs font-semibold uppercase tracking-[0.15em] text-muted underline-offset-4 hover:underline">Forgot details?</Link></p>
       <p className="py-1 text-center text-xs text-muted">OR</p>
       <Link href={`/signup?next=${encodeURIComponent(next)}`} className={buttonClass("outline", "w-full uppercase tracking-[0.2em]")}>
         Create account

@@ -1,6 +1,7 @@
 // Event details (screen design page 11): sponsors and Tonight's Scoreboard: what was given,
 // what it cost, what came in, and every limited-edition sale. VIPs' names are shown only to
 // other VIPs; everyone else sees them masked.
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { DollarSign, Heart } from "lucide-react";
@@ -89,7 +90,12 @@ async function Details({ params }: { params: PageProps<"/events/[slug]/details">
             <tbody>
               {sales.map((sale) => (
                 <tr key={sale.id} className="border-t border-line/60">
-                  <td className="py-1.5">{sale.soldBy}</td>
+                  <td className="py-1.5">
+                    {sale.soldBy}
+                    {(sale.artSlug || sale.lotId) && (
+                      <Link href={sale.artSlug ? `/art/${sale.artSlug}` : `/auctions/${sale.lotId}`} className="block text-[10px] text-muted underline-offset-2 hover:underline">{sale.label}</Link>
+                    )}
+                  </td>
                   <td className="py-1.5">{showName(sale.buyer, sale.buyerRole, sale.buyerTier)}</td>
                   <td className="py-1.5 text-right">{money(sale.unitPriceCents * sale.quantity)}</td>
                 </tr>
@@ -97,6 +103,11 @@ async function Details({ params }: { params: PageProps<"/events/[slug]/details">
               {!sales.length && <tr><td colSpan={3} className="py-4 text-center text-muted">No art sold yet tonight.</td></tr>}
             </tbody>
           </table>
+          {!viewer?.isVip && sales.length > 0 && (
+            <p className="mt-3 text-[11px] text-muted">
+              VIP members&apos; names are shown only to other VIPs. <Link href={`/membership?next=${encodeURIComponent(`/events/${event.slug}/details`)}`} className="font-semibold text-vip underline">Become a VIP</Link>
+            </p>
+          )}
         </section>
       </div>
     </>

@@ -9,6 +9,7 @@ import { PageHeader, SectionLabel, Skeleton, buttonClass } from "@/components/ui
 import { getUser } from "@/lib/dal";
 import { money } from "@/lib/format";
 import { CLUB_SEATS, TIERS } from "@/lib/membership";
+import { safeNext } from "@/lib/next-path";
 import { clubSeatsTaken } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Membership" };
@@ -21,7 +22,7 @@ export default function MembershipPage(props: PageProps<"/membership">) {
         <div>
           <h2 className="text-2xl font-bold leading-tight">What will happen if we completely give God one year of our lives?</h2>
           <p className="mt-2 text-sm text-muted">Monthly support sends the mission to the next city. Limited artwork, real testimonies, visible Gospel impact.</p>
-          <p className="mt-2 text-sm font-semibold">Any membership makes you a VIP: you can buy art and bid in the auctions.</p>
+          <p className="mt-2 text-sm font-semibold">Any membership makes you a VIP: you can buy art, before and during each event, and get the auctions&apos; early Buy Now deals.</p>
         </div>
         <Suspense fallback={<Skeleton className="h-96" />}><Tiers searchParams={props.searchParams} /></Suspense>
         <section className="rounded-md bg-fog p-5">
@@ -39,17 +40,20 @@ export default function MembershipPage(props: PageProps<"/membership">) {
 }
 
 async function Tiers({ searchParams }: { searchParams: PageProps<"/membership">["searchParams"] }) {
-  const [user, taken, { full }] = await Promise.all([getUser(), clubSeatsTaken(), searchParams]);
+  const [user, taken, sp] = await Promise.all([getUser(), clubSeatsTaken(), searchParams]);
   const seatsLeft = Math.max(0, CLUB_SEATS - taken);
+  const next = typeof sp.next === "string" ? safeNext(sp.next, "") : "";
   return (
     <div className="space-y-3">
-      {full && <p role="alert" className="rounded-md bg-[#fdecea] p-3 text-sm">All 700 seats in the 700 Club are taken.</p>}
+      {sp.full && <p role="alert" className="rounded-md bg-[#fdecea] p-3 text-sm">All 700 seats in the 700 Club are taken.</p>}
+      {next && !user?.isVip && <p className="rounded-md bg-vip/10 p-3 text-sm text-vip">Choose a membership and you&apos;ll go straight back to finish your purchase.</p>}
       {TIERS.map((t) => {
         const current = user?.membershipTier === t.id;
         return (
           <form key={t.id} action={chooseTier}
             className={`flex items-center justify-between rounded-md border p-4 ${t.club ? "border-ink" : "border-line"} ${current ? "bg-ink text-white" : ""}`}>
             <input type="hidden" name="tier" value={t.id} />
+            {next && <input type="hidden" name="next" value={next} />}
             <div>
               <p className="font-bold">{t.name}</p>
               <p className="text-sm">{money(t.cents, { cents: true })} / month{t.club && t.id !== "seven_hundred_club" ? " · 700 Club" : ""}</p>

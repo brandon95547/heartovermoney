@@ -1,6 +1,6 @@
 // The database schema (Drizzle ORM, Postgres). Money is stored in cents.
 import {
-  pgTable, pgEnum, uuid, text, integer, timestamp, jsonb, primaryKey, uniqueIndex, index,
+  pgTable, pgEnum, uuid, text, integer, boolean, timestamp, jsonb, primaryKey, uniqueIndex, index,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["member", "vip", "admin"]);
@@ -15,6 +15,8 @@ export const fulfillmentEnum = pgEnum("fulfillment", ["pickup", "ship"]);
 export const cardDesignEnum = pgEnum("card_design", ["joker", "queen", "rabbit"]);
 export const jokerChoiceEnum = pgEnum("joker_choice", ["kept", "gift_card"]);
 export const photoRemovalEnum = pgEnum("photo_removal", ["admin", "community"]);
+export const filmKindEnum = pgEnum("film_kind", ["music_video", "city_film", "mission_story", "behind_the_scenes"]);
+export const provenanceKindEnum = pgEnum("provenance_kind", ["issued", "transferred"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -27,6 +29,21 @@ export const users = pgTable("users", {
   role: roleEnum("role").notNull().default("member"),
   membershipTier: tierEnum("membership_tier"),
   membershipSince: timestamp("membership_since", { withTimezone: true }),
+  // Settings: where to ship by default (checkout and the card process fill it in), and
+  // whether to get news of drops and events by email.
+  shipAddress: text("ship_address"),
+  emailUpdates: boolean("email_updates").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// "Forgot details?": a one-time link to set a new password, valid for an hour. Only a hash of
+// the token is stored, so the table can't be used to sign in.
+export const passwordResets = pgTable("password_resets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -84,6 +101,18 @@ export const editions = pgTable("editions", {
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("editions_artwork_number").on(t.artworkId, t.number)]);
 
+// A numbered piece's ownership record: issued to its first collector, and every later transfer
+// (resale isn't open yet, but the record is kept from the first sale so the piece's history
+// follows its certificate ID).
+export const provenance = pgTable("provenance", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  editionId: uuid("edition_id").notNull().references(() => editions.id, { onDelete: "cascade" }),
+  kind: provenanceKindEnum("kind").notNull(),
+  fromUserId: uuid("from_user_id").references(() => users.id),
+  toUserId: uuid("to_user_id").references(() => users.id),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("provenance_edition").on(t.editionId)]);
+
 export type Sponsor = { name: string; logo?: string };
 export type EventDocument = { name: string; url: string };
 
@@ -103,6 +132,8 @@ export const events = pgTable("events", {
   hostName: text("host_name").notNull(),
   sponsors: jsonb("sponsors").$type<Sponsor[]>().notNull().default([]),
   documents: jsonb("documents").$type<EventDocument[]>().notNull().default([]),
+  // The contract's terms (development overview page 4), one paragraph per line.
+  terms: text("terms").notNull().default(""),
 });
 
 // An Art + Charity auction lot: bought outright with Buy Now before the event, or bid on
@@ -122,6 +153,9 @@ export const lots = pgTable("lots", {
   auctionEndsAt: timestamp("auction_ends_at", { withTimezone: true }).notNull(),
   // VIPs see Buy Now deals before everyone else, until this moment.
   vipUntil: timestamp("vip_until", { withTimezone: true }),
+  // Art lots are for VIPs throughout. Anyone signed in can bid on the others at the live
+  // auction (development overview page 6); Buy Now before the event is a VIP deal either way.
+  isArt: boolean("is_art").notNull().default(true),
   status: lotStatusEnum("status").notNull().default("open"),
   buyerId: uuid("buyer_id").references(() => users.id),
   soldCents: integer("sold_cents"),
@@ -215,5 +249,45 @@ export const registrations = pgTable("registrations", {
   jokerChoice: jokerChoiceEnum("joker_choice"),
   fulfillment: fulfillmentEnum("fulfillment").notNull().default("pickup"),
   shipAddress: text("ship_address"),
+  // When the card was handed over at the door (staff scan its code at /admin/check-in).
+  checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("registrations_event_user").on(t.eventId, t.userId)]);
+
+// The Joker's two minutes, kept on the server: when the clock started for this guest, and what
+// they chose while it ran. Leaving and coming back doesn't restart it, and a choice made after
+// time is up doesn't count (the Joker is kept).
+export const jokerTimers = pgTable("joker_timers", {
+  eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  choice: jokerChoiceEnum("choice"),
+  chosenAt: timestamp("chosen_at", { withTimezone: true }),
+}, (t) => [primaryKey({ columns: [t.eventId, t.userId] })]);
+
+// Films and stories (business plan, "Website Blueprint"): music videos, city films, mission
+// stories and behind the scenes, each tied to a city when it has one.
+export const films = pgTable("films", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  kind: filmKindEnum("kind").notNull(),
+  cityId: uuid("city_id").references(() => cities.id),
+  summary: text("summary").notNull(),
+  body: text("body").notNull(),
+  poster: text("poster").notNull(),
+  // Empty until the film is published: the page says it premieres soon instead of linking nowhere.
+  videoUrl: text("video_url"),
+  minutes: integer("minutes"),
+  publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Messages sent from the Contact page.
+export const contactMessages = pgTable("contact_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

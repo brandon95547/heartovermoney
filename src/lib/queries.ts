@@ -19,7 +19,7 @@ const artworkCard = {
 };
 export type ArtworkCard = Awaited<ReturnType<typeof listArtworks>>[number];
 
-export async function listArtworks(opts: { followedBy?: string; citySlug?: string; limit?: number } = {}) {
+export async function listArtworks(opts: { followedBy?: string; citySlug?: string; artistSlug?: string; limit?: number } = {}) {
   await connection();
   const q = db.select(artworkCard).from(s.artworks)
     .innerJoin(s.artists, eq(s.artists.id, s.artworks.artistId))
@@ -31,6 +31,7 @@ export async function listArtworks(opts: { followedBy?: string; citySlug?: strin
       db.select({ id: s.follows.artistId }).from(s.follows).where(eq(s.follows.userId, opts.followedBy))));
   }
   if (opts.citySlug) where.push(eq(s.cities.slug, opts.citySlug));
+  if (opts.artistSlug) where.push(eq(s.artists.slug, opts.artistSlug));
   if (where.length) q.where(and(...where));
   return q.orderBy(desc(s.artworks.createdAt), asc(s.artworks.title)).limit(opts.limit ?? 50);
 }
@@ -50,12 +51,20 @@ const lotCard = {
   id: s.lots.id, title: s.lots.title, maker: s.lots.maker, images: s.lots.images, status: s.lots.status,
   quantityLabel: s.lots.quantityLabel, retailValueCents: s.lots.retailValueCents, buyNowCents: s.lots.buyNowCents,
   startingBidCents: s.lots.startingBidCents, auctionStartsAt: s.lots.auctionStartsAt, auctionEndsAt: s.lots.auctionEndsAt,
-  vipUntil: s.lots.vipUntil, topBidCents: topBid, bidCount,
+  vipUntil: s.lots.vipUntil, isArt: s.lots.isArt, topBidCents: topBid, bidCount,
 };
 
 export async function listOpenLots(limit = 10) {
   await connection();
   return db.select(lotCard).from(s.lots).where(eq(s.lots.status, "open")).orderBy(asc(s.lots.auctionEndsAt)).limit(limit);
+}
+
+// Every lot, for the Auctions page: live ones first, then the ones still to come, then the closed.
+export async function listLots() {
+  await connection();
+  return db.select({ ...lotCard, eventSlug: s.events.slug, eventTitle: s.events.title, cityName: s.cities.name })
+    .from(s.lots).innerJoin(s.events, eq(s.events.id, s.lots.eventId)).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+    .orderBy(asc(s.lots.auctionEndsAt));
 }
 
 export async function getLot(id: string) {
@@ -104,6 +113,40 @@ export async function listCardOptions(eventId: string) {
     .groupBy(s.cards.design).orderBy(desc(sql`count(*)`)).limit(3);
 }
 
+// My Cards: every collector card someone has claimed, with its event and where it stands.
+export async function listMyCards(userId: string) {
+  await connection();
+  return db.select({
+    code: s.cards.code, design: s.cards.design, jokerChoice: s.registrations.jokerChoice,
+    fulfillment: s.registrations.fulfillment, shipAddress: s.registrations.shipAddress,
+    checkedInAt: s.registrations.checkedInAt, registeredAt: s.registrations.createdAt,
+    eventSlug: s.events.slug, eventTitle: s.events.title, eventStartsAt: s.events.startsAt, venue: s.events.venue,
+    cityName: s.cities.name, cityState: s.cities.state,
+  }).from(s.registrations)
+    .innerJoin(s.cards, eq(s.cards.id, s.registrations.cardId))
+    .innerJoin(s.events, eq(s.events.id, s.registrations.eventId))
+    .innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+    .where(eq(s.registrations.userId, userId)).orderBy(desc(s.events.startsAt));
+}
+
+// A card at the door: who registered it, for which event, and whether it was handed over yet.
+export async function getCheckIn(code: string) {
+  await connection();
+  const [row] = await db.select({
+    registrationId: s.registrations.id, code: s.cards.code, design: s.cards.design,
+    jokerChoice: s.registrations.jokerChoice, fulfillment: s.registrations.fulfillment,
+    checkedInAt: s.registrations.checkedInAt,
+    displayName: s.users.displayName, username: s.users.username,
+    eventTitle: s.events.title, eventStartsAt: s.events.startsAt, cityName: s.cities.name,
+  }).from(s.cards)
+    .innerJoin(s.registrations, eq(s.registrations.cardId, s.cards.id))
+    .innerJoin(s.users, eq(s.users.id, s.registrations.userId))
+    .innerJoin(s.events, eq(s.events.id, s.cards.eventId))
+    .innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+    .where(eq(s.cards.code, code.trim().toUpperCase())).limit(1);
+  return row ?? null;
+}
+
 export async function getRegistration(eventId: string, userId: string) {
   await connection();
   const [r] = await db.select({
@@ -141,6 +184,7 @@ export async function listEventSales(eventId: string) {
     id: s.orderItems.id, label: s.orderItems.label, quantity: s.orderItems.quantity, unitPriceCents: s.orderItems.unitPriceCents,
     buyer: s.users.username, buyerRole: s.users.role, buyerTier: s.users.membershipTier, createdAt: s.orders.createdAt, kind: s.orders.kind,
     soldBy: sql<string>`coalesce(${s.artists.name}, ${s.lots.maker}, 'Heart Over Money')`,
+    artSlug: s.artworks.slug, lotId: s.lots.id,
   }).from(s.orderItems)
     .innerJoin(s.orders, eq(s.orders.id, s.orderItems.orderId))
     .innerJoin(s.users, eq(s.users.id, s.orders.userId))
@@ -202,17 +246,18 @@ export async function getCity(slug: string) {
 export async function getCertificate(code: string) {
   await connection();
   const [row] = await db.select({
+    editionId: s.editions.id, ownerId: s.editions.ownerId,
     code: s.editions.certificateCode, number: s.editions.number, issuedAt: s.editions.issuedAt,
     title: s.artworks.title, slug: s.artworks.slug, editionSize: s.artworks.editionSize, kind: s.artworks.kind,
     images: s.artworks.images, description: s.artworks.description,
     artistName: s.artists.name, artistBio: s.artists.bio,
     cityName: s.cities.name, cityState: s.cities.state, citySlug: s.cities.slug, songTitle: s.cities.songTitle,
-    story: s.cities.story, ownerUsername: s.users.username,
+    story: s.cities.story, cityId: s.cities.id, artistSlug: s.artists.slug,
+    owners: sql<number>`(select count(*)::int from ${s.provenance} where ${s.provenance.editionId} = ${s.editions.id})`,
   }).from(s.editions)
     .innerJoin(s.artworks, eq(s.artworks.id, s.editions.artworkId))
     .innerJoin(s.artists, eq(s.artists.id, s.artworks.artistId))
     .innerJoin(s.cities, eq(s.cities.id, s.artworks.cityId))
-    .leftJoin(s.users, eq(s.users.id, s.editions.ownerId))
     .where(eq(s.editions.certificateCode, code)).limit(1);
   return row ?? null;
 }
@@ -254,16 +299,77 @@ export async function listOrders(userId: string) {
   return db.select().from(s.orders).where(eq(s.orders.userId, userId)).orderBy(desc(s.orders.createdAt)).limit(20);
 }
 
-export async function search(term: string) {
+export type SearchFilters = { available?: boolean; type?: "art" | "merch" | "shoes" };
+
+// Search across the site. `available` leaves out sold-out pieces; `type` narrows the art to
+// fine art (prints and founders art), merch or shoes.
+export async function search(term: string, filters: SearchFilters = {}) {
   await connection();
   const like = `%${term.replace(/[%_]/g, "")}%`;
-  const [artworks, lots, cities] = await Promise.all([
+  const artWhere = [or(ilike(s.artworks.title, like), ilike(s.artists.name, like), ilike(s.cities.name, like))];
+  if (filters.available) artWhere.push(sql`${soldCount} < ${s.artworks.editionSize}`);
+  if (filters.type === "art") artWhere.push(inArray(s.artworks.kind, ["print", "founders_art"]));
+  if (filters.type === "merch" || filters.type === "shoes") artWhere.push(eq(s.artworks.kind, filters.type));
+  const [artworks, lots, cities, artists, events, films] = await Promise.all([
     db.select(artworkCard).from(s.artworks)
       .innerJoin(s.artists, eq(s.artists.id, s.artworks.artistId))
       .innerJoin(s.cities, eq(s.cities.id, s.artworks.cityId))
-      .where(or(ilike(s.artworks.title, like), ilike(s.artists.name, like), ilike(s.cities.name, like))).limit(30),
-    db.select(lotCard).from(s.lots).where(or(ilike(s.lots.title, like), ilike(s.lots.maker, like))).limit(10),
+      .where(and(...artWhere)).limit(30),
+    db.select(lotCard).from(s.lots).where(and(or(ilike(s.lots.title, like), ilike(s.lots.maker, like)),
+      filters.available ? eq(s.lots.status, "open") : undefined)).limit(10),
     db.select().from(s.cities).where(ilike(s.cities.name, like)).limit(10),
+    db.select({ slug: s.artists.slug, name: s.artists.name }).from(s.artists).where(ilike(s.artists.name, like)).limit(10),
+    db.select({ slug: s.events.slug, title: s.events.title, startsAt: s.events.startsAt, cityName: s.cities.name })
+      .from(s.events).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+      .where(or(ilike(s.events.title, like), ilike(s.cities.name, like))).limit(10),
+    db.select({ slug: s.films.slug, title: s.films.title, kind: s.films.kind }).from(s.films)
+      .leftJoin(s.cities, eq(s.cities.id, s.films.cityId))
+      .where(or(ilike(s.films.title, like), ilike(s.cities.name, like))).limit(10),
   ]);
-  return { artworks, lots, cities };
+  return { artworks, lots, cities, artists, events, films };
+}
+
+export async function getArtist(slug: string, viewerId?: string) {
+  await connection();
+  const [row] = await db.select({
+    id: s.artists.id, slug: s.artists.slug, name: s.artists.name, bio: s.artists.bio,
+    followers: sql<number>`(select count(*)::int from ${s.follows} where ${s.follows.artistId} = ${s.artists.id})`,
+    following: viewerId
+      ? sql<boolean>`exists(select 1 from ${s.follows} where ${s.follows.artistId} = ${s.artists.id} and ${s.follows.userId} = ${viewerId})`
+      : sql<boolean>`false`,
+  }).from(s.artists).where(eq(s.artists.slug, slug)).limit(1);
+  return row ?? null;
+}
+
+export async function listArtists() {
+  await connection();
+  return db.select({ slug: s.artists.slug, name: s.artists.name, bio: s.artists.bio }).from(s.artists).orderBy(asc(s.artists.name));
+}
+
+const filmCard = {
+  slug: s.films.slug, title: s.films.title, kind: s.films.kind, summary: s.films.summary, poster: s.films.poster,
+  minutes: s.films.minutes, publishedAt: s.films.publishedAt, videoUrl: s.films.videoUrl,
+  cityName: s.cities.name, citySlug: s.cities.slug,
+};
+
+export async function listFilms(kind?: string) {
+  await connection();
+  return db.select(filmCard).from(s.films).leftJoin(s.cities, eq(s.cities.id, s.films.cityId))
+    .where(kind ? sql`${s.films.kind} = ${kind}` : undefined).orderBy(desc(s.films.publishedAt));
+}
+
+export async function getFilm(slug: string) {
+  await connection();
+  const [row] = await db.select({ ...filmCard, body: s.films.body, cityState: s.cities.state })
+    .from(s.films).leftJoin(s.cities, eq(s.cities.id, s.films.cityId)).where(eq(s.films.slug, slug)).limit(1);
+  return row ?? null;
+}
+
+// The film to show with a city's art: its music video if it has one, else its newest film.
+export async function filmForCity(citySlug: string) {
+  await connection();
+  const [row] = await db.select({ slug: s.films.slug, title: s.films.title, kind: s.films.kind })
+    .from(s.films).innerJoin(s.cities, eq(s.cities.id, s.films.cityId)).where(eq(s.cities.slug, citySlug))
+    .orderBy(sql`${s.films.kind} = 'music_video' desc`, desc(s.films.publishedAt)).limit(1);
+  return row ?? null;
 }

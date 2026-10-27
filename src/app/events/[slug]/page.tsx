@@ -1,5 +1,6 @@
-// Event overview (screen design page 10): photos posted live down the left, the event
-// contract's progress, its story and documents. Swipe right to left for the details.
+// Event overview (screen design page 10; development overview page 4): photos posted live
+// down the left, the event contract's progress, its story, terms and documents, the way in to
+// register, and the city's collection. Swipe right to left for the details.
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -9,7 +10,7 @@ import { AutoRefresh, SwipeTo } from "@/components/event-client";
 import { PageHeader, ProgressBar, Skeleton, buttonClass } from "@/components/ui";
 import { CARD_DESIGNS } from "@/lib/cards";
 import { getUser } from "@/lib/dal";
-import { getEvent, getRegistration, getScoreboard, listPhotos } from "@/lib/queries";
+import { getEvent, getNextEvent, getRegistration, getScoreboard, listPhotos } from "@/lib/queries";
 import { EventHeading } from "./event-heading";
 
 export default function EventOverviewPage(props: PageProps<"/events/[slug]">) {
@@ -25,13 +26,16 @@ async function Overview({ params }: { params: PageProps<"/events/[slug]">["param
   const { slug } = await params;
   const found = await getEvent(slug);
   if (!found) notFound();
-  const { event, cityName } = found;
+  const { event, cityName, citySlug } = found;
   const user = await getUser();
-  const [score, photos, registration] = await Promise.all([
+  const [score, photos, registration, next] = await Promise.all([
     getScoreboard(event.id, event.costCents, event.charityPercent),
     listPhotos(event.id),
     user ? getRegistration(event.id, user.id) : null,
+    getNextEvent(),
   ]);
+  // Registration (the card process at /events) is open for the next event only.
+  const canRegister = !registration && next?.id === event.id;
   const days = Math.max(0, Math.ceil((event.startsAt.getTime() - new Date().getTime()) / 86_400_000));
 
   return (
@@ -59,6 +63,9 @@ async function Overview({ params }: { params: PageProps<"/events/[slug]">["param
               {registration.jokerChoice === "gift_card" && " Your $20 gift card is ready."}
             </p>
           )}
+          {canRegister && (
+            <Link href="/events" className={buttonClass("black", "h-10 w-full text-xs")}>Register and get your card</Link>
+          )}
           <ProgressBar label="Cost" percent={score.fundedPercent} />
           <dl className="grid grid-cols-3 gap-2 text-sm">
             <div><dt className="sr-only">Funded</dt><dd className="font-bold">{score.fundedPercent}%</dd><dd className="text-xs">funded</dd></div>
@@ -66,17 +73,30 @@ async function Overview({ params }: { params: PageProps<"/events/[slug]">["param
             <div><dt className="sr-only">Days to go</dt><dd className="font-bold">{days}</dd><dd className="text-xs">{days === 1 ? "day" : "days"} to go</dd></div>
           </dl>
           <p className="text-xs leading-relaxed">{event.description}</p>
-          <ul className="divide-y divide-paper overflow-hidden rounded-md bg-fog">
-            {event.documents.map((d) => (
-              <li key={d.name}>
-                <a href={d.url} className="flex items-center gap-3 px-3 py-3 text-xs"><FileText className="size-4 shrink-0" strokeWidth={1.5} />{d.name}</a>
-              </li>
-            ))}
-          </ul>
+          {event.terms && (
+            <details id="terms" className="rounded-md border border-line p-3 text-xs">
+              <summary className="cursor-pointer font-semibold">Terms of the contract</summary>
+              <div className="mt-2 space-y-2 leading-relaxed">{event.terms.split("\n").map((line) => <p key={line}>{line}</p>)}</div>
+            </details>
+          )}
+          {event.documents.length > 0 && (
+            <ul className="divide-y divide-paper overflow-hidden rounded-md bg-fog">
+              {event.documents.map((d) => (
+                <li key={d.name}>
+                  {d.url && d.url !== "#" ? (
+                    <a href={d.url} target="_blank" rel="noopener" className="flex items-center gap-3 px-3 py-3 text-xs"><FileText className="size-4 shrink-0" strokeWidth={1.5} />{d.name}</a>
+                  ) : (
+                    <span className="flex items-center gap-3 px-3 py-3 text-xs text-muted"><FileText className="size-4 shrink-0" strokeWidth={1.5} />{d.name} · shared soon</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
           <Link href={`/events/${slug}/details`} className={buttonClass("outline", "h-10 w-full text-xs")}>
             Details and scoreboard <ChevronRight className="size-4" />
           </Link>
           <Link href={`/events/${slug}/menu`} className={buttonClass("quiet", "h-10 w-full text-xs")}>Order food + drink</Link>
+          <Link href={`/cities/${citySlug}`} className="block text-center text-xs font-semibold underline">See the {cityName} collection</Link>
         </div>
       </div>
     </SwipeTo>

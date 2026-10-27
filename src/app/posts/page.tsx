@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PhotoWall } from "@/components/photo-wall";
+import { SiteMenu, SiteMenuFallback } from "@/components/site-menu";
 import { getUser } from "@/lib/dal";
 import { getNextEvent, listPhotos } from "@/lib/queries";
 
@@ -22,5 +23,9 @@ async function Feed() {
   const user = await getUser();
   const [photos, next] = await Promise.all([listPhotos(null, user?.id), getNextEvent()]);
   // New photos go to the event that is on now, or the next one.
-  return <PhotoWall photos={photos} viewer={user && { id: user.id, isAdmin: user.role === "admin" }} postHref={next ? `/events/${next.slug}/photos/new` : undefined} showEvent />;
+  return (
+    <PhotoWall photos={photos} viewer={user && { id: user.id, isAdmin: user.role === "admin" }} showEvent
+      menu={<Suspense fallback={<SiteMenuFallback tone="dark" />}><SiteMenu tone="dark" /></Suspense>}
+      postHref={next ? `/events/${next.slug}/photos/new` : undefined} />
+  );
 }

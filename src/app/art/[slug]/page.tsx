@@ -1,5 +1,6 @@
 // Art detail (screen design pages 25–26): photos, stock, price, artist, Add to cart, and what
-// makes it collectible — its edition, certificate and city.
+// makes it collectible — its edition, certificate, city and film. Anyone can look; only VIPs
+// can buy art (a guest is sent to sign in, a member to Membership, and both come back here).
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -9,7 +10,7 @@ import { PageHeader, Skeleton } from "@/components/ui";
 import { getUser } from "@/lib/dal";
 import { kindLabel, money } from "@/lib/format";
 import { needsVip } from "@/lib/membership";
-import { getArtwork } from "@/lib/queries";
+import { filmForCity, getArtwork } from "@/lib/queries";
 
 export default function ArtPage(props: PageProps<"/art/[slug]">) {
   return (
@@ -26,6 +27,8 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
   const { slug } = await params;
   const [a, user] = await Promise.all([getArtwork(slug), getUser()]);
   if (!a) notFound();
+  const film = await filmForCity(a.citySlug);
+  const gate = !needsVip(a.kind) ? undefined : !user ? "signin" : !user.isVip ? "vip" : undefined;
   const left = a.editionSize - a.sold;
   const soldOut = left <= 0;
 
@@ -37,9 +40,9 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
           <p className="text-xs font-semibold uppercase tracking-wider">{soldOut ? "Sold out" : "In stock"}</p>
           <p className="mt-1 text-3xl font-semibold">{money(a.priceCents, { cents: true })}</p>
           <h2 className="mt-2 text-lg font-semibold leading-snug">{a.title}</h2>
-          <p className="text-sm">by <span className="font-bold">{a.artistName}</span></p>
+          <p className="text-sm">by <Link href={`/artists/${a.artistSlug}`} className="font-bold underline-offset-2 hover:underline">{a.artistName}</Link></p>
         </div>
-        <AddToCart slug={a.slug} soldOut={soldOut} vipOnly={needsVip(a.kind) && !user?.isVip} />
+        <AddToCart slug={a.slug} soldOut={soldOut} gate={gate} />
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div><dt className="text-xs text-muted">Edition</dt><dd className="font-semibold">{a.editionSize} pieces</dd></div>
           <div><dt className="text-xs text-muted">Available</dt><dd className="font-semibold">{soldOut ? "None, never reprinted" : `${left} of ${a.editionSize}`}</dd></div>
@@ -51,9 +54,17 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
           <p className="font-semibold">Certificate of authenticity</p>
           <p className="text-muted">Numbered, with the title, edition number, city, date, artist, the collection&apos;s story and song, and a QR code to the {a.cityName} story.</p>
         </div>
-        <p className="border-t border-line pt-4 text-xs leading-relaxed text-muted">
-          Located in: {a.cityName}, {a.cityState}, United States. Claim it at the event, or have it shipped.
-        </p>
+        {film && (
+          <Link href={`/films/${film.slug}`} className="flex items-center justify-between rounded-md border border-line p-4 text-sm">
+            <span><span className="block text-xs text-muted">The {a.cityName} {film.kind === "music_video" ? "music video" : "film"}</span><b>{film.title}</b></span>
+            <span className="font-semibold underline">Watch</span>
+          </Link>
+        )}
+        <div className="space-y-1 border-t border-line pt-4 text-xs leading-relaxed text-muted">
+          <p>Located in: {a.cityName}, {a.cityState}, United States</p>
+          <p>Pickup: claim it at the door of the next event, at no cost.</p>
+          <p>Shipping: or have it shipped; you give the address at checkout.</p>
+        </div>
       </div>
     </article>
   );

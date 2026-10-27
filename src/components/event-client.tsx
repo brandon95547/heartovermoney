@@ -3,7 +3,7 @@
 // Small interactive pieces of the event pages.
 import { useActionState, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Heart, ThumbsDown, Trash2 } from "lucide-react";
+import { Forward, Heart, Share, ThumbsDown, Trash2 } from "lucide-react";
 import { orderFood, postPhoto, removePhoto, toggleDownvote, toggleLike, type EventActionState } from "@/app/actions/events";
 import { buttonClass } from "@/components/ui";
 import { money } from "@/lib/format";
@@ -62,6 +62,36 @@ export function DownvoteButton({ photoId, slug, downvoted }: { photoId: string; 
       onClick={() => start(async () => { setOptimistic(!on); await toggleDownvote(photoId, slug); })}
       className="drop-shadow">
       <ThumbsDown className={`size-7 ${on ? "fill-white" : ""}`} strokeWidth={1.5} />
+    </button>
+  );
+}
+
+// Shares a link with the phone's share sheet, or copies it where there is none. On the photo
+// wall the "Link copied" note opens to the right; in a page header (`inHeader`), to the left.
+export function ShareButton({ path, title, inHeader = false }: { path: string; title: string; inHeader?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(id);
+  }, [copied]);
+  const share = async () => {
+    const url = new URL(path, window.location.origin).toString();
+    if (navigator.share) {
+      try { await navigator.share({ title, url }); } catch { /* closed without sharing */ }
+      return;
+    }
+    await navigator.clipboard?.writeText(url);
+    setCopied(true);
+  };
+  return (
+    <button type="button" onClick={share} aria-label="Share" className={`relative ${inHeader ? "flex h-full items-center" : "drop-shadow"}`}>
+      {inHeader ? <Share className="size-5" strokeWidth={1.5} /> : <Forward className="size-7" strokeWidth={1.5} />}
+      {copied && (
+        <span role="status" className={`absolute top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-bold text-ink shadow ${inHeader ? "right-full mr-2" : "left-full ml-2"}`}>
+          Link copied
+        </span>
+      )}
     </button>
   );
 }

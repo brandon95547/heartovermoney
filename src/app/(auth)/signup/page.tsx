@@ -11,7 +11,7 @@ export default function SignUpPage() {
   return (
     <main className="flex flex-1 flex-col px-8 pb-10 pt-4">
       <Link href="/" className="self-end text-sm">Skip</Link>
-      <div className="flex justify-center py-10"><Logo size={72} /></div>
+      <div className="flex justify-center py-10"><Logo size={86} /></div>
       <h1 className="mb-6 text-center text-lg font-bold">Join Heart Over Money</h1>
       <Suspense fallback={<Skeleton className="h-96" />}><SignUpForm /></Suspense>
     </main>

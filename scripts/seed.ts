@@ -1,5 +1,5 @@
 // Development seed: sample artists, cities, artworks, an Art + Charity event with auction
-// lots, menu, photos and sales, onboarding cards, and demo accounts. Wipes the data first.
+// lots, menu, photos and sales, onboarding cards, films, and demo accounts. Wipes the data first.
 //
 //   npm run db:seed
 //
@@ -45,7 +45,8 @@ const day = 86_400_000;
 async function main() {
   // Wipe in one statement so foreign keys don't care about the order.
   await db.execute(rawSql`truncate table photo_downvotes, photo_likes, photos, order_items, orders, cart_items, bids, lots,
-    menu_items, editions, artworks, follows, artists, registrations, cards, events, cities, users restart identity cascade`);
+    menu_items, provenance, editions, artworks, follows, artists, registrations, joker_timers, cards, films, events, cities,
+    password_resets, contact_messages, users restart identity cascade`);
   fs.rmSync(PLACEHOLDERS, { recursive: true, force: true });
 
   const passwordHash = await bcrypt.hash(process.env.SEED_PASSWORD || "heart-over-money", 10);
@@ -121,10 +122,11 @@ async function main() {
     for (let i = 1; i <= count; i++) {
       const number = already + i;
       const issuedAt = new Date(Date.now() - 10 * day);
-      await db.insert(s.editions).values({
+      const [edition] = await db.insert(s.editions).values({
         artworkId: piece.id, number, ownerId: u[username].id, orderId: order.id, issuedAt,
         certificateCode: certificateCode({ title: piece.title, number, editionSize: piece.editionSize, city: city.name, state: city.state, issuedAt, artistPrefix: piece.certificatePrefix }),
-      });
+      }).returning();
+      await db.insert(s.provenance).values({ editionId: edition.id, kind: "issued", toUserId: u[username].id, at: issuedAt });
     }
   };
 
@@ -134,7 +136,16 @@ async function main() {
     description: "An evening of worship, music and art. Every limited-edition piece sold tonight is recorded on the scoreboard, and the profit after the event's cost is shared with tonight's charity.",
     costCents: 1_000_000, charityPercent: 50, charityName: "Charlotte Mission Partners", hostName: "Heart Over Money",
     sponsors: [{ name: "Good News Shoes" }, { name: "Natural Fabric" }, { name: "JSF Artwork" }],
-    documents: [{ name: "Event plan.pdf", url: "#" }, { name: "Projected impact.pdf", url: "#" }],
+    documents: [
+      { name: "Event plan.txt", url: "/documents/charlotte-event-plan.txt" },
+      { name: "Projected impact.txt", url: "/documents/charlotte-projected-impact.txt" },
+    ],
+    terms: [
+      "This is a public event contract: every ticket, plate, product and piece of art sold for the event is counted on the scoreboard as it happens.",
+      "The event's cost is covered first. Half of everything raised after the cost goes to Charlotte Mission Partners; the rest sends the mission to the next city.",
+      "Limited-edition art is for VIP members. Each piece is numbered, never reprinted in its size or format, and comes with a certificate of authenticity.",
+      "Collector cards are claimed at the door with the code in My Cards, or mailed to the address given when registering.",
+    ].join("\n"),
   }).returning())[0];
 
   await sell("jesus-multiplies", "faithful_collector", 1);
@@ -153,14 +164,14 @@ async function main() {
       auctionStartsAt: new Date(eventStart.getTime() + 60 * 60_000), auctionEndsAt: new Date(eventStart.getTime() + 2 * 60 * 60_000),
       vipUntil: new Date(Date.now() + 1 * day) },
     { eventId: event.id, title: "Collector Print Bundle", maker: "Betty W",
-      description: "A bulk lot of 25 numbered Harbor Light prints. Bid on the whole lot, or buy single prints at the event.",
+      description: "A bulk lot of 25 numbered Harbor Light prints, sold together to the winning bidder.",
       images: [placeholder("lot-print-bundle", "Print Bundle (25)", 180)],
       quantityLabel: "Bulk lot of 25", retailValueCents: 187500, buyNowCents: 100000, startingBidCents: 50000,
       auctionStartsAt: new Date(Date.now() - 60 * 60_000), auctionEndsAt: new Date(Date.now() + 2 * day) },
     { eventId: event.id, title: "Hand-painted Good News Shoes", maker: "LoveAlways",
       description: "One pair, painted by hand for this night. Size chosen with the winner.",
       images: [placeholder("lot-shoes", "Hand-painted Shoes", 30)],
-      quantityLabel: "1 pair", retailValueCents: 60000, buyNowCents: 45000, startingBidCents: 20000,
+      quantityLabel: "1 pair", retailValueCents: 60000, buyNowCents: 45000, startingBidCents: 20000, isArt: false,
       auctionStartsAt: new Date(eventStart.getTime() + 60 * 60_000), auctionEndsAt: new Date(eventStart.getTime() + 2 * 60 * 60_000) },
   ]).returning();
   await db.insert(s.bids).values([
@@ -224,7 +235,31 @@ async function main() {
     { eventId: event.id, userId: u.sarah_parish.id, cardId: firstOf("rabbit").id, fulfillment: "ship" as const, shipAddress: "12 Elm Street, Charlotte, NC 28202" },
   ]);
 
-  console.log(`Seeded ${users.length} users, ${artworks.length} artworks, ${lots.length} lots, ${photos.length} photos.`);
+  // Films and stories. Without a video URL a film's page says it premieres soon.
+  const films = await db.insert(s.films).values([
+    { slug: "charlotte-live", title: "Charlotte (Live)", kind: "music_video" as const, cityId: c.charlotte.id, minutes: 4,
+      summary: "The song recorded with Charlotte's musicians on the last night of the trip.",
+      body: "Recorded live on the steps where the week's public worship began, with a choir from the church on Tryon Street. Every piece in the Charlotte collection is tied to this song.",
+      poster: placeholder("film-charlotte-live", "Charlotte (Live)", 250, 1600, 900), publishedAt: new Date("2026-09-20T16:00:00Z") },
+    { slug: "charlotte-the-founding-city", title: "Charlotte: The Founding City", kind: "city_film" as const, cityId: c.charlotte.id, minutes: 12,
+      summary: "A week in the first city, from the first prayer walk to the first collection.",
+      body: "The film follows the team through a week of worship, prayer on the streets and the recording of Charlotte (Live), and the people whose stories became the founding collection.",
+      poster: placeholder("film-charlotte-city", "The Founding City", 275, 1600, 900), publishedAt: new Date("2026-09-24T16:00:00Z") },
+    { slug: "harbor-song", title: "Harbor Song", kind: "music_video" as const, cityId: c.charleston.id, minutes: 5,
+      summary: "Charleston's song, filmed on the harbor at sunrise with a church choir.",
+      body: "A choir from Charleston joined the music video at the harbor. Harbor Light and Queen of Hearts were drawn from the mornings of this shoot.",
+      poster: placeholder("film-harbor-song", "Harbor Song", 195, 1600, 900), publishedAt: new Date("2026-10-18T16:00:00Z") },
+    { slug: "why-we-travel", title: "Why We Travel", kind: "mission_story" as const, cityId: null, minutes: 6,
+      summary: "One city, one mission, one testimony, one limited art collection.",
+      body: "Why the team goes city by city: making music, sharing the Good News, filming what happens, and turning it into art that sends the mission on to the next city.",
+      poster: placeholder("film-why-we-travel", "Why We Travel", 10, 1600, 900), publishedAt: new Date("2026-08-30T16:00:00Z") },
+    { slug: "painting-the-founders-canvas", title: "Painting the Founders Canvas", kind: "behind_the_scenes" as const, cityId: c.charlotte.id, minutes: 3,
+      summary: "Jesse Shane Fisher paints the Charlotte founders canvas live during worship.",
+      body: "Behind the scenes of the one-of-one canvas auctioned at Art + Charity: the first sketch, the night it was painted, and the finished piece.",
+      poster: placeholder("film-founders-canvas", "Founders Canvas", 305, 1600, 900), publishedAt: new Date("2026-09-16T16:00:00Z") },
+  ]).returning();
+
+  console.log(`Seeded ${users.length} users, ${artworks.length} artworks, ${lots.length} lots, ${photos.length} photos, ${films.length} films.`);
 }
 
 main().then(() => client.end()).catch(async (err) => { console.error(err); await client.end(); process.exit(1); });

@@ -49,3 +49,10 @@ export const kindLabel: Record<string, string> = {
   print: "Limited Edition Print",
   founders_art: "Founders Edition Art",
 };
+
+export const filmKindLabel: Record<string, string> = {
+  music_video: "Music video",
+  city_film: "City film",
+  mission_story: "Mission story",
+  behind_the_scenes: "Behind the scenes",
+};

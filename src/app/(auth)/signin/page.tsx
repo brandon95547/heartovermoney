@@ -11,7 +11,7 @@ export default function SignInPage() {
   return (
     <main className="flex flex-1 flex-col px-8 pb-10 pt-4">
       <Link href="/" className="self-end text-sm">Skip</Link>
-      <div className="flex flex-1 items-center justify-center py-16"><Logo size={88} /></div>
+      <div className="flex flex-1 items-center justify-center py-16"><Logo size={104} /></div>
       <Suspense fallback={<Skeleton className="h-64" />}><SignInForm /></Suspense>
     </main>
   );
