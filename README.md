@@ -95,5 +95,5 @@ boundary (Next.js Cache Components), so run it before pushing.
 ## Open questions
 
 The client has answered most of the first questions. Still open: who counts as a Founding
-Collector, and how certificates track ownership through resale. The card faces and the logo
-are stand-ins until the real designs arrive.
+Collector, and how certificates track ownership through resale. The card faces are stand-ins
+until the real designs arrive.
