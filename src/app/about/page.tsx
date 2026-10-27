@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ChevronRight } from "lucide-react";
 import { PageHeader, SectionLabel, Skeleton, buttonClass } from "@/components/ui";
+import { getContent, paragraphs } from "@/lib/content";
 import { listArtists } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "About" };
@@ -16,8 +17,7 @@ export default function AboutPage() {
       <article className="space-y-8 p-5">
         <section className="space-y-3">
           <h2 className="text-2xl font-bold leading-tight">Heart Over Money</h2>
-          <p className="leading-relaxed">A Christian art and media company: an art house and a movement that travels city by city. Musicians, filmmakers and artists go on each campaign together; what happens there becomes a song, a film and a limited collection.</p>
-          <p className="leading-relaxed">We&apos;re not building another merchandise company. We&apos;re building a collectible visual history of a Christian movement across America, financed by the people who collect it.</p>
+          <Suspense fallback={<Skeleton className="h-32" />}><Intro /></Suspense>
           <Link href="/mission" className="inline-flex items-center gap-1 text-sm font-semibold underline">Read the mission <ChevronRight className="size-4" /></Link>
         </section>
         <section>
@@ -54,4 +54,10 @@ async function Artists() {
       ))}
     </ul>
   );
+}
+
+// The introduction, as edited in the admin panel (Content).
+async function Intro() {
+  const { "about.intro": text } = await getContent(["about.intro"]);
+  return paragraphs(text).map((p) => <p key={p} className="leading-relaxed">{p}</p>);
 }

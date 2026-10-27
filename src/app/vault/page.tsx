@@ -41,6 +41,7 @@ async function Vault() {
               <div className="relative aspect-square overflow-hidden rounded-sm bg-mist"><ArtImage src={p.images[0]} alt={p.title} sizes="200px" /></div>
               <p className="mt-2 truncate text-sm font-semibold">{p.title}</p>
               <p className="text-xs text-muted">No. {p.number} of {p.editionSize} · {p.cityName}</p>
+              {p.status !== "active" && <p className="text-xs font-semibold text-alert">{p.status === "void" ? "Void" : "Damaged"}</p>}
             </Link>
           </li>
         ))}

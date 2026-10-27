@@ -13,6 +13,8 @@ import { needsVip } from "@/lib/membership";
 export type ActionState = { error?: string; ok?: string } | undefined;
 
 const VIP_ONLY = "Art is for VIP members. Become a VIP from $25 a month.";
+// Before a drop's release date, VIPs buy it early (the Collector Club's early access).
+const EARLY_ACCESS_ONLY = "This drop isn't released yet. VIP members can buy it early.";
 // The auction's rules (development overview page 6, and the client's "art is VIP only"): Buy
 // Now before the event is an early deal for VIPs; at the live auction anyone signed in can bid,
 // except on art, which stays VIP-only.
@@ -28,10 +30,11 @@ async function signedIn(next: string) {
 export async function addToCart(_: ActionState, form: FormData): Promise<ActionState> {
   const slug = String(form.get("slug") ?? "");
   const user = await signedIn(`/art/${slug}`);
-  const [piece] = await db.select({ id: s.artworks.id, size: s.artworks.editionSize, kind: s.artworks.kind })
+  const [piece] = await db.select({ id: s.artworks.id, size: s.artworks.editionSize, kind: s.artworks.kind, releasesAt: s.artworks.releasesAt })
     .from(s.artworks).where(eq(s.artworks.slug, slug)).limit(1);
   if (!piece) return { error: "That piece no longer exists." };
   if (needsVip(piece.kind) && !user.isVip) return { error: VIP_ONLY };
+  if (!user.isVip && piece.releasesAt && piece.releasesAt > new Date()) return { error: EARLY_ACCESS_ONLY };
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(s.editions).where(eq(s.editions.artworkId, piece.id));
   if (n >= piece.size) return { error: "This edition is sold out. It will never be reprinted." };
   await db.insert(s.cartItems).values({ userId: user.id, artworkId: piece.id, quantity: 1 })
@@ -61,6 +64,7 @@ export async function checkout(_: ActionState, form: FormData): Promise<ActionSt
       const items = await tx.select({
         artworkId: s.cartItems.artworkId, quantity: s.cartItems.quantity, title: s.artworks.title,
         priceCents: s.artworks.priceCents, editionSize: s.artworks.editionSize, prefix: s.artworks.certificatePrefix, kind: s.artworks.kind,
+        releasesAt: s.artworks.releasesAt,
         cityName: s.cities.name, cityState: s.cities.state,
       }).from(s.cartItems)
         .innerJoin(s.artworks, eq(s.artworks.id, s.cartItems.artworkId))
@@ -68,6 +72,7 @@ export async function checkout(_: ActionState, form: FormData): Promise<ActionSt
         .where(eq(s.cartItems.userId, user.id));
       if (!items.length) throw new CheckoutError("Your cart is empty.");
       if (!user.isVip && items.some((i) => needsVip(i.kind))) throw new CheckoutError(VIP_ONLY);
+      if (!user.isVip && items.some((i) => i.releasesAt && i.releasesAt > new Date())) throw new CheckoutError(EARLY_ACCESS_ONLY);
 
       const total = items.reduce((t, i) => t + i.priceCents * i.quantity, 0);
       const [order] = await tx.insert(s.orders).values({

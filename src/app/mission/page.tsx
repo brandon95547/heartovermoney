@@ -2,8 +2,10 @@
 // local church): why the company travels and how a city campaign works.
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { Logo } from "@/components/logo";
-import { PageHeader, SectionLabel, buttonClass } from "@/components/ui";
+import { PageHeader, SectionLabel, Skeleton, buttonClass } from "@/components/ui";
+import { getContent, paragraphs } from "@/lib/content";
 
 export const metadata: Metadata = { title: "The mission" };
 
@@ -29,8 +31,7 @@ export default function MissionPage() {
         </div>
         <section className="space-y-3">
           <h2 className="text-2xl font-bold leading-tight">Art from the mission</h2>
-          <p className="leading-relaxed">We travel city by city making music, sharing the Gospel, filming what happens, and turning those experiences into highly limited collectible artwork.</p>
-          <p className="leading-relaxed">Collectors own numbered pieces connected to real people, real cities and real moments, and that revenue helps send the mission to the next city. Every collection exists for a reason: a city visited, a song, a music video, a group of people, a mission and a story of faith. The city becomes part of the artwork&apos;s history.</p>
+          <Suspense fallback={<Skeleton className="h-32" />}><Intro /></Suspense>
           <p className="font-bold">Each purchase helps send the next outreach.</p>
         </section>
         <section>
@@ -60,4 +61,10 @@ export default function MissionPage() {
       </article>
     </main>
   );
+}
+
+// The introduction, as edited in the admin panel (Content).
+async function Intro() {
+  const { "mission.intro": text } = await getContent(["mission.intro"]);
+  return paragraphs(text).map((p) => <p key={p} className="leading-relaxed">{p}</p>);
 }

@@ -35,7 +35,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["
   }
   const tier = tierById(user.membershipTier);
   const [orders, vault] = await Promise.all([listOrders(user.id), listVault(user.id)]);
-  const superOptimistic = isSuperOptimistic(user.membershipTier, vault.filter((p) => FINE_ART_KINDS.includes(p.kind)).length);
+  const superOptimistic = isSuperOptimistic(user.membershipTier, vault.filter((p) => p.status === "active" && FINE_ART_KINDS.includes(p.kind)).length);
   const link = (href: string, label: string, detail?: string) => (
     <Link href={href} className="flex items-center justify-between py-4 text-sm">
       <span>{label}</span><span className="flex items-center gap-2 text-muted">{detail}<ChevronRight className="size-4" /></span>
@@ -62,8 +62,8 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["
         {link("/membership", "Membership", tier ? tier.name : "Join")}
         {link("/events", "The next event")}
         {link("/settings", "Settings")}
-        {user.role === "admin" && link("/admin/check-in", "Door check-in", "Admin")}
-        {user.role === "admin" && link("/admin/photos", "Removed photos", "Admin")}
+        {user.role === "admin" && link("/admin", "Admin panel", "Staff")}
+        {user.role === "admin" && link("/admin/check-in", "Door check-in", "Staff")}
       </nav>
       <section>
         <SectionLabel className="mb-2"><span id="orders">Orders</span></SectionLabel>
@@ -72,7 +72,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["
             {orders.map((o) => (
               <li key={o.id}>
                 <Link href={`/orders/${o.id}`} className="flex justify-between py-3 text-sm">
-                  <span className="capitalize">{o.kind === "lot" ? "Auction lot" : o.kind} · {o.createdAt.toLocaleDateString("en-US", { timeZone: "America/New_York" })}</span>
+                  <span className="capitalize">{o.kind === "lot" ? "Auction lot" : o.kind} · {o.createdAt.toLocaleDateString("en-US", { timeZone: "America/New_York" })}{o.status === "refunded" ? " · refunded" : ""}</span>
                   <span className="font-semibold">{money(o.totalCents)}</span>
                 </Link>
               </li>

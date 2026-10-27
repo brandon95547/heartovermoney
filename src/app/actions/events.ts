@@ -2,8 +2,6 @@
 
 // Event actions: register through the card process, like a photo, post one to the photo wall,
 // moderate the wall, and order food and drink.
-import fs from "node:fs/promises";
-import crypto from "node:crypto";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -12,7 +10,7 @@ import { db, schema as s } from "@/db";
 import { CARD_DESIGNS, type CardDesign } from "@/lib/cards";
 import { getUser } from "@/lib/dal";
 import { checkInQr } from "@/lib/check-in";
-import { UPLOAD_DIR, uploadPath } from "@/lib/uploads";
+import { saveUpload, uploadProblem } from "@/lib/uploads";
 
 export type EventActionState = { error?: string } | undefined;
 
@@ -184,9 +182,6 @@ export async function restorePhoto(form: FormData) {
   revalidatePath("/admin/photos");
 }
 
-const TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-const MAX_BYTES = 12 * 1024 * 1024;
-
 export async function postPhoto(_: EventActionState, form: FormData): Promise<EventActionState> {
   const slug = String(form.get("slug") ?? "");
   const user = await getUser();
@@ -196,15 +191,12 @@ export async function postPhoto(_: EventActionState, form: FormData): Promise<Ev
 
   const file = form.get("photo");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a photo." };
-  const ext = TYPES[file.type];
-  if (!ext) return { error: "Photos can be JPEG, PNG or WebP." };
-  if (file.size > MAX_BYTES) return { error: "Photos can be up to 12 MB." };
+  const problem = uploadProblem(file);
+  if (problem) return { error: problem.replace("Pictures", "Photos") };
 
-  const name = `${crypto.randomUUID()}.${ext}`;
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  await fs.writeFile(uploadPath(name), Buffer.from(await file.arrayBuffer()));
+  const image = await saveUpload(file);
   const caption = String(form.get("caption") ?? "").trim().slice(0, 200);
-  await db.insert(s.photos).values({ eventId: event.id, userId: user.id, image: `/media/${name}`, caption });
+  await db.insert(s.photos).values({ eventId: event.id, userId: user.id, image, caption });
   redirect(`/events/${slug}/photos`);
 }
 

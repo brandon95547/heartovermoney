@@ -57,9 +57,15 @@ async function Order({ params }: { params: PageProps<"/orders/[id]">["params"] }
         ))}
         <li className="flex justify-between p-4 font-bold"><span>Total</span><span>{money(order.totalCents, { cents: true })}</span></li>
       </ul>
-      <p className="text-sm">
-        {order.fulfillment === "ship" ? `Shipping to: ${order.shipAddress}` : pickup}
-      </p>
+      {order.status === "refunded" ? (
+        <p className="rounded-md bg-alert/10 p-3 text-sm text-alert">This order was refunded.</p>
+      ) : (
+        <p className="text-sm">
+          {order.fulfillment === "ship"
+            ? `${order.fulfilledAt ? "Shipped" : "Shipping"} to: ${order.shipAddress}${order.trackingNumber ? ` · Tracking ${order.trackingNumber}` : ""}`
+            : order.fulfilledAt ? "Handed over. Thank you." : pickup}
+        </p>
+      )}
       {editions.length > 0 && (
         <section className="space-y-2">
           <h3 className="font-semibold">Your certificates of authenticity</h3>

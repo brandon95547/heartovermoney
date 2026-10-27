@@ -43,7 +43,13 @@ async function Certificate({ params }: { params: PageProps<"/certificates/[code]
         </div>
         <div className="relative aspect-square overflow-hidden rounded-sm bg-mist"><ArtImage src={c.images[0]} alt={c.title} priority /></div>
         <div>
-          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-go/10 px-3 py-1 text-xs font-semibold text-go"><BadgeCheck className="size-4" /> Verified authentic</p>
+          {c.status === "active" ? (
+            <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-go/10 px-3 py-1 text-xs font-semibold text-go"><BadgeCheck className="size-4" /> Verified authentic</p>
+          ) : (
+            <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-alert/10 px-3 py-1 text-xs font-semibold text-alert">
+              {c.status === "void" ? "Void: this certificate is no longer in good standing" : "Recorded as damaged"}
+            </p>
+          )}
           <h2 className="text-2xl font-bold leading-tight">{c.title}</h2>
           <p className="text-sm">No. <b>{c.number}</b> of {c.editionSize} · {kindLabel[c.kind]}</p>
         </div>

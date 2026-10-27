@@ -40,6 +40,7 @@ export async function getArtwork(slug: string) {
   await connection();
   const [row] = await db.select({
     ...artworkCard, description: s.artworks.description, artistBio: s.artists.bio, cityState: s.cities.state,
+    releasesAt: s.artworks.releasesAt,
   }).from(s.artworks)
     .innerJoin(s.artists, eq(s.artists.id, s.artworks.artistId))
     .innerJoin(s.cities, eq(s.cities.id, s.artworks.cityId))
@@ -246,7 +247,7 @@ export async function getCity(slug: string) {
 export async function getCertificate(code: string) {
   await connection();
   const [row] = await db.select({
-    editionId: s.editions.id, ownerId: s.editions.ownerId,
+    editionId: s.editions.id, ownerId: s.editions.ownerId, status: s.editions.status, statusNote: s.editions.statusNote,
     code: s.editions.certificateCode, number: s.editions.number, issuedAt: s.editions.issuedAt,
     title: s.artworks.title, slug: s.artworks.slug, editionSize: s.artworks.editionSize, kind: s.artworks.kind,
     images: s.artworks.images, description: s.artworks.description,
@@ -267,7 +268,7 @@ export async function listVault(userId: string) {
   return db.select({
     code: s.editions.certificateCode, number: s.editions.number, issuedAt: s.editions.issuedAt,
     title: s.artworks.title, slug: s.artworks.slug, editionSize: s.artworks.editionSize, images: s.artworks.images,
-    kind: s.artworks.kind, cityName: s.cities.name,
+    kind: s.artworks.kind, cityName: s.cities.name, status: s.editions.status,
   }).from(s.editions)
     .innerJoin(s.artworks, eq(s.artworks.id, s.editions.artworkId))
     .innerJoin(s.cities, eq(s.cities.id, s.artworks.cityId))

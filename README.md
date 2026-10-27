@@ -48,7 +48,7 @@ mail the reset link is in the log.
 | Collecting | Vault, certificates of authenticity (`/certificates/[code]`): a public check that a piece is genuine, with its ownership record; the owner's name shows only to the owner |
 | Stories | Films (`/films`, `/films/[slug]`), The mission, About, Contact |
 | Account | Sign in and up, Forgot details (`/reset-password`), Profile, My cards (`/profile/cards`), Settings (shipping address, email updates, password), Membership, Search with filters |
-| Staff | Door check-in (`/admin/check-in`): scan a guest's QR, hand over the card. Removed photos (`/admin/photos`) |
+| Admin | `/admin`, for accounts with the admin role (see below) |
 | Later | Chat (the Connections Messenger) has a placeholder page |
 
 Navigation: the bottom bar is icons only, as in the designs (Posts side: ♥ and Chat;
@@ -65,6 +65,28 @@ which stay VIP-only. The 700 Club is $77 a month, with 700 seats. A 700 Club mem
 more than one fine art piece is a Super Optimistic VIP.
 
 Certificate IDs follow the business plan: `TITLE_NUMBER/EDITION_CITY-ST_MM.DD.YYYY-ARTIST`.
+
+## The admin panel
+
+`/admin` runs the site without touching the database. Every change is kept in the activity
+log (`/admin/activity`) with who made it, and changes that matter (a membership set by hand,
+a piece retired, a refund, a removed bid) need a reason.
+
+| Section | What it does |
+| --- | --- |
+| Dashboard | What needs doing (orders to hand over or ship, messages, photos the community removed), the next event, the latest orders and changes |
+| Orders | Filter by what's open; hand over or ship (with tracking); refund (the order leaves the scoreboard, its numbered pieces are retired) |
+| Art | Pieces (price, edition size, release date, pictures), artists, collections (each city's story, song and cover) |
+| Editions | Every numbered piece and its owner; record a sale made in person; move a piece to a new owner; mark it void or damaged |
+| Events | Details, terms, sponsors, documents, cost goal and charity share; the food and drink menu |
+| Cards | Each event's deck; add a run of codes or import printed ones; mark mailed; cancel a registration |
+| Auctions | Schedule lots (art or open to all); see bids; remove a bid; close a lot to the top bidder |
+| Members | Roles and memberships, 700 Club seats; set a membership by hand; email a password reset link |
+| Content | The home page's current drop, the Mission and About introductions, films |
+| Photos, Messages, Check-in | Restore removed photos; Contact messages; the door check-in |
+
+A drop with a release date in the future can be bought only by VIPs until then (their early
+access). Pictures added in the admin panel are saved with posted photos in `UPLOAD_DIR`.
 
 ## Where things are
 
@@ -120,5 +142,4 @@ The client has answered most of the first questions. Still open:
 - Bidding: the overview says everyone bids at the live auction and the client says art is
   VIP-only; the site does both (art lots VIP-only), pending his confirmation.
 - The card faces and the film posters are stand-ins until the real designs and films arrive.
-- An admin panel for art, editions, cards, events, orders, memberships, auctions and content
-  (so the team can run the site without database edits) is the next piece of work.
+- Card payments: everything is still test mode, including memberships and refunds.

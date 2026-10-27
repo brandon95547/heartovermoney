@@ -28,7 +28,9 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
   const [a, user] = await Promise.all([getArtwork(slug), getUser()]);
   if (!a) notFound();
   const film = await filmForCity(a.citySlug);
-  const gate = !needsVip(a.kind) ? undefined : !user ? "signin" : !user.isVip ? "vip" : undefined;
+  // Art is VIP-only; anything not yet released is too, until its release (VIPs' early access).
+  const unreleased = !!a.releasesAt && a.releasesAt > new Date();
+  const gate = !needsVip(a.kind) && !unreleased ? undefined : !user ? "signin" : !user.isVip ? "vip" : undefined;
   const left = a.editionSize - a.sold;
   const soldOut = left <= 0;
 
@@ -37,12 +39,17 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
       <Gallery images={a.images} alt={a.title} />
       <div className="space-y-5 px-5 py-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider">{soldOut ? "Sold out" : "In stock"}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider">{soldOut ? "Sold out" : unreleased ? "Coming soon" : "In stock"}</p>
+          {unreleased && !soldOut && (
+            <p className="mt-1 inline-block rounded bg-vip/10 px-2 py-0.5 text-xs font-semibold text-vip">
+              Releases {a.releasesAt!.toLocaleString("en-US", { month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })} · VIP members can buy it now
+            </p>
+          )}
           <p className="mt-1 text-3xl font-semibold">{money(a.priceCents, { cents: true })}</p>
           <h2 className="mt-2 text-lg font-semibold leading-snug">{a.title}</h2>
           <p className="text-sm">by <Link href={`/artists/${a.artistSlug}`} className="font-bold underline-offset-2 hover:underline">{a.artistName}</Link></p>
         </div>
-        <AddToCart slug={a.slug} soldOut={soldOut} gate={gate} />
+        <AddToCart slug={a.slug} soldOut={soldOut} gate={gate} early={unreleased && !needsVip(a.kind)} />
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div><dt className="text-xs text-muted">Edition</dt><dd className="font-semibold">{a.editionSize} pieces</dd></div>
           <div><dt className="text-xs text-muted">Available</dt><dd className="font-semibold">{soldOut ? "None, never reprinted" : `${left} of ${a.editionSize}`}</dd></div>

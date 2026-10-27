@@ -1,12 +1,12 @@
 // The door: staff scan a guest's QR (or type the card's code) to hand over their collector
 // card. Admins only.
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { checkInCard } from "@/app/actions/events";
-import { Empty, PageHeader, Skeleton, buttonClass } from "@/components/ui";
+import { AdminTitle } from "@/components/admin-ui";
+import { Empty, Skeleton, buttonClass } from "@/components/ui";
+import { requireAdmin } from "@/lib/admin";
 import { CARD_DESIGNS } from "@/lib/cards";
-import { requireUser } from "@/lib/dal";
 import { eventDate } from "@/lib/format";
 import { getCheckIn } from "@/lib/queries";
 
@@ -14,9 +14,9 @@ export const metadata: Metadata = { title: "Check-in" };
 
 export default function CheckInPage(props: PageProps<"/admin/check-in">) {
   return (
-    <main>
-      <PageHeader title="Check-in" back="/profile" />
-      <Suspense fallback={<Skeleton className="m-5 h-64" />}><CheckIn searchParams={props.searchParams} /></Suspense>
+    <main className="p-5">
+      <AdminTitle title="Door check-in" />
+      <Suspense fallback={<Skeleton className="h-64" />}><CheckIn searchParams={props.searchParams} /></Suspense>
     </main>
   );
 }
@@ -24,11 +24,10 @@ export default function CheckInPage(props: PageProps<"/admin/check-in">) {
 async function CheckIn({ searchParams }: { searchParams: PageProps<"/admin/check-in">["searchParams"] }) {
   const sp = await searchParams;
   const code = typeof sp.code === "string" ? sp.code.slice(0, 40) : "";
-  const user = await requireUser(`/admin/check-in${code ? `?code=${encodeURIComponent(code)}` : ""}`);
-  if (user.role !== "admin") notFound();
+  await requireAdmin(`/admin/check-in${code ? `?code=${encodeURIComponent(code)}` : ""}`);
   const found = code ? await getCheckIn(code) : null;
   return (
-    <div className="space-y-6 p-5">
+    <div className="space-y-6">
       <form action="/admin/check-in" className="flex gap-3">
         <input name="code" defaultValue={code} placeholder="Card code, e.g. HOM-0001" aria-label="Card code" autoCapitalize="characters"
           className="h-12 min-w-0 flex-1 rounded-md bg-fog px-4 font-mono text-sm uppercase outline-none focus:ring-2 focus:ring-ink/20" />

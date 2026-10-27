@@ -16,7 +16,7 @@ function Message({ state }: { state: ActionState }) {
 
 // `gate`: the piece is art, which only VIPs can buy. A visitor who isn't signed in is sent to
 // sign in first, and a member who isn't a VIP to Membership; either way they come back here.
-export function AddToCart({ slug, soldOut, gate }: { slug: string; soldOut: boolean; gate?: "signin" | "vip" }) {
+export function AddToCart({ slug, soldOut, gate, early = false }: { slug: string; soldOut: boolean; gate?: "signin" | "vip"; early?: boolean }) {
   const [state, action, pending] = useActionState(addToCart, undefined);
   if (gate && !soldOut) {
     const back = `/art/${slug}`;
@@ -26,7 +26,8 @@ export function AddToCart({ slug, soldOut, gate }: { slug: string; soldOut: bool
           ? <Link href={withNext("/signin", back)} className={buttonClass("primary", "w-52")}>Sign in to buy</Link>
           : <Link href={withNext("/membership", back)} className={buttonClass("primary", "w-52")}>Become a VIP to buy</Link>}
         <p className="mt-2 text-sm text-muted">
-          Art is for VIP members. {gate === "signin" ? "Sign in, or create an account, then choose a membership from $25 a month." : "Membership starts at $25 a month, and brings you back here."}
+          {early ? "VIP members can buy this drop before its release." : "Art is for VIP members."}{" "}
+          {gate === "signin" ? "Sign in, or create an account, then choose a membership from $25 a month." : "Membership starts at $25 a month, and brings you back here."}
         </p>
       </div>
     );

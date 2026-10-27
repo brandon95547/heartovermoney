@@ -36,6 +36,13 @@
       "when": 1793113671077,
       "tag": "0004_blueprint_pages",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793117922302,
+      "tag": "0005_admin_panel",
+      "breakpoints": true
     }
   ]
 }

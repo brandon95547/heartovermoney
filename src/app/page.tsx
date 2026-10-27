@@ -7,8 +7,9 @@ import { ArtworkCard, Carousel, LotCard } from "@/components/cards";
 import { ArtImage } from "@/components/art-image";
 import { SiteMenu, SiteMenuFallback } from "@/components/site-menu";
 import { Skeleton, SectionLabel } from "@/components/ui";
+import { getContent } from "@/lib/content";
 import { getUser } from "@/lib/dal";
-import { listArtworks, listCities, listOpenLots } from "@/lib/queries";
+import { getCity, listArtworks, listCities, listOpenLots } from "@/lib/queries";
 
 export default function HomePage() {
   return (
@@ -17,6 +18,7 @@ export default function HomePage() {
         <Suspense fallback={<SiteMenuFallback />}><SiteMenu /></Suspense>
         <Link href="/" aria-label="Heart Over Money home" className="justify-self-center"><Logo size={66} /></Link>
       </div>
+      <Suspense fallback={null}><CurrentDrop /></Suspense>
       <Suspense fallback={<RowSkeleton title="New Works" />}><NewWorks /></Suspense>
       <Suspense fallback={<RowSkeleton title="Auction Lots Ending Soon" />}><EndingLots /></Suspense>
       <Suspense fallback={<RowSkeleton title="Collections" />}><Collections /></Suspense>
@@ -30,6 +32,24 @@ function RowSkeleton({ title }: { title: string }) {
       <h2 className="mb-3 text-lg">{title}</h2>
       <div className="flex gap-4"><Skeleton className="h-52 w-40" /><Skeleton className="h-52 w-40" /></div>
     </section>
+  );
+}
+
+// The drop the team features from the admin panel (Content), if any.
+async function CurrentDrop() {
+  const c = await getContent(["home.featuredCity", "home.featuredHeadline", "home.featuredText"]);
+  const city = c["home.featuredCity"] ? await getCity(c["home.featuredCity"]) : null;
+  if (!city) return null;
+  return (
+    <Link href={`/cities/${city.slug}`} className="relative mb-6 block aspect-[16/10] overflow-hidden rounded-md">
+      <ArtImage src={city.heroImage} alt={city.name} priority />
+      <span className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+      <span className="absolute inset-x-4 bottom-4 text-white">
+        <span className="block text-[11px] font-bold uppercase tracking-[0.2em]">Current drop</span>
+        <span className="block text-2xl font-bold leading-tight">{c["home.featuredHeadline"] || `The ${city.name} collection`}</span>
+        {c["home.featuredText"] && <span className="block text-sm">{c["home.featuredText"]}</span>}
+      </span>
+    </Link>
   );
 }
 

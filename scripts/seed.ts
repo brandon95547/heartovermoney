@@ -46,7 +46,7 @@ async function main() {
   // Wipe in one statement so foreign keys don't care about the order.
   await db.execute(rawSql`truncate table photo_downvotes, photo_likes, photos, order_items, orders, cart_items, bids, lots,
     menu_items, provenance, editions, artworks, follows, artists, registrations, joker_timers, cards, films, events, cities,
-    password_resets, contact_messages, users restart identity cascade`);
+    password_resets, contact_messages, audit_log, site_content, users restart identity cascade`);
   fs.rmSync(PLACEHOLDERS, { recursive: true, force: true });
 
   const passwordHash = await bcrypt.hash(process.env.SEED_PASSWORD || "heart-over-money", 10);

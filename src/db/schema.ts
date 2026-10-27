@@ -10,13 +10,16 @@ export const tierEnum = pgEnum("membership_tier", [
 ]);
 export const lotStatusEnum = pgEnum("lot_status", ["open", "sold", "closed"]);
 export const orderKindEnum = pgEnum("order_kind", ["art", "lot", "food", "ticket", "membership"]);
-export const orderStatusEnum = pgEnum("order_status", ["pending", "paid"]);
+export const orderStatusEnum = pgEnum("order_status", ["pending", "paid", "refunded"]);
 export const fulfillmentEnum = pgEnum("fulfillment", ["pickup", "ship"]);
 export const cardDesignEnum = pgEnum("card_design", ["joker", "queen", "rabbit"]);
 export const jokerChoiceEnum = pgEnum("joker_choice", ["kept", "gift_card"]);
 export const photoRemovalEnum = pgEnum("photo_removal", ["admin", "community"]);
 export const filmKindEnum = pgEnum("film_kind", ["music_video", "city_film", "mission_story", "behind_the_scenes"]);
 export const provenanceKindEnum = pgEnum("provenance_kind", ["issued", "transferred"]);
+// A numbered piece that is lost, destroyed or refunded is retired, never renumbered: its number
+// stays used, so no two pieces ever share one.
+export const editionStatusEnum = pgEnum("edition_status", ["active", "void", "damaged"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -87,6 +90,8 @@ export const artworks = pgTable("artworks", {
   images: jsonb("images").$type<string[]>().notNull(),
   // Short code used in certificate IDs, e.g. JSF for the artist.
   certificatePrefix: text("certificate_prefix").notNull(),
+  // A drop's release: until then only VIPs can buy it (their early access); empty means on sale.
+  releasesAt: timestamp("releases_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -99,6 +104,8 @@ export const editions = pgTable("editions", {
   orderId: uuid("order_id"),
   certificateCode: text("certificate_code").notNull().unique(),
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  status: editionStatusEnum("status").notNull().default("active"),
+  statusNote: text("status_note"),
 }, (t) => [uniqueIndex("editions_artwork_number").on(t.artworkId, t.number)]);
 
 // A numbered piece's ownership record: issued to its first collector, and every later transfer
@@ -192,6 +199,11 @@ export const orders = pgTable("orders", {
   eventId: uuid("event_id").references(() => events.id),
   fulfillment: fulfillmentEnum("fulfillment"),
   shipAddress: text("ship_address"),
+  // Handed over at the event, or shipped (with its tracking number); refunded orders leave
+  // the scoreboard, and their numbered pieces are retired.
+  fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+  trackingNumber: text("tracking_number"),
+  refundedAt: timestamp("refunded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("orders_event").on(t.eventId)]);
 
@@ -249,8 +261,10 @@ export const registrations = pgTable("registrations", {
   jokerChoice: jokerChoiceEnum("joker_choice"),
   fulfillment: fulfillmentEnum("fulfillment").notNull().default("pickup"),
   shipAddress: text("ship_address"),
-  // When the card was handed over at the door (staff scan its code at /admin/check-in).
+  // When the card was handed over at the door (staff scan its code at /admin/check-in), or
+  // put in the mail.
   checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+  shippedAt: timestamp("shipped_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("registrations_event_user").on(t.eventId, t.userId)]);
 
@@ -289,5 +303,25 @@ export const contactMessages = pgTable("contact_messages", {
   name: text("name").notNull(),
   email: text("email").notNull(),
   message: text("message").notNull(),
+  handledAt: timestamp("handled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Every change made in the admin panel: who, what, to which record, and why where it matters
+// (a membership changed by hand, a piece voided, an order refunded).
+export const auditLog = pgTable("audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  target: text("target").notNull(),
+  detail: text("detail").notNull().default(""),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("audit_log_at").on(t.at)]);
+
+// Words the team edits in the admin panel (the home page's featured drop, the Mission and
+// About introductions), by key. A missing key falls back to the text in the code.
+export const siteContent = pgTable("site_content", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
