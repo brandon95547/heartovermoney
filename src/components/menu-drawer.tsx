@@ -31,8 +31,8 @@ export function MenuDrawer({ person, postsHref, tone = "light" }: { person: Menu
       <dialog ref={dialog} aria-label="Menu" onClick={(e) => { if (e.target === dialog.current) close(); }}
         className="my-0 mr-0 ml-[max(0px,calc((100vw-28rem)/2))] h-dvh max-h-none w-[85%] max-w-sm bg-paper md:ml-[calc((100vw-42rem)/2)] p-0 text-ink backdrop:bg-black/50 open:flex open:flex-col">
         <div className="flex items-center gap-3 border-b border-line p-4">
-          <Link href="/" onClick={close} aria-label="Heart Over Money home" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-ink">
-            <Logo size={30} reversed />
+          <Link href="/" onClick={close} aria-label="Heart Over Money home" className="flex h-11 shrink-0 items-center">
+            <Logo size={40} />
           </Link>
           <form action="/search" role="search" onSubmit={close} className="relative flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
@@ -53,7 +53,7 @@ export function MenuDrawer({ person, postsHref, tone = "light" }: { person: Menu
                   return (
                     <li key={href}>
                       <Link href={href} onClick={close} aria-current={current ? "page" : undefined}
-                        className={`block rounded-md px-3 py-2.5 text-sm uppercase tracking-wide ${current ? "bg-ink font-semibold text-white" : "hover:bg-fog"}`}>
+                        className={`-mx-3 block rounded-md px-3 py-2.5 text-sm uppercase tracking-wide ${current ? "bg-ink font-semibold text-white" : "hover:bg-fog"}`}>
                         {label}
                       </Link>
                     </li>
