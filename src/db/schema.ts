@@ -286,6 +286,29 @@ export const jokerTimers = pgTable("joker_timers", {
   chosenAt: timestamp("chosen_at", { withTimezone: true }),
 }, (t) => [primaryKey({ columns: [t.eventId, t.userId] })]);
 
+// The Connections Messenger (design pages 3–4; development overview page 3): guests registered
+// for the same event message each other while its connections are open. A message keeps the
+// event it was sent from, where the two met.
+export const messages = pgTable("messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id),
+  senderId: uuid("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  recipientId: uuid("recipient_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+}, (t) => [index("messages_sender").on(t.senderId, t.createdAt), index("messages_recipient").on(t.recipientId, t.createdAt)]);
+
+// The red + on a conversation: this guest wants to stay connected with the other. Once both
+// have tapped it, they're a Connection and stay in touch after the event; guests who haven't
+// connected become anonymous, and their conversations are deleted, when connections close.
+export const connections = pgTable("connections", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  otherId: uuid("other_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  eventId: uuid("event_id").notNull().references(() => events.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.otherId] })]);
+
 // Films and stories (business plan, "Website Blueprint"): music videos, city films, mission
 // stories and behind the scenes, each tied to a city when it has one.
 export const films = pgTable("films", {

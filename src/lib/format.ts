@@ -32,6 +32,16 @@ export function dayAndTime(d: Date, now: Date = new Date()): string {
   return `${label} ${shortTime(d)}`;
 }
 
+// When a message was sent, as the Messenger lists it (design page 3): "9:30 AM" today,
+// "Yesterday", or "6/19/22", by the calendar day in Eastern time.
+export function messageTime(d: Date, now: Date = new Date()): string {
+  const day = (x: Date) => x.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const days = Math.round((Date.parse(day(now)) - Date.parse(day(d))) / 86_400_000);
+  if (days <= 0) return shortTime(d);
+  if (days === 1) return "Yesterday";
+  return d.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit", timeZone: "America/New_York" });
+}
+
 // "25m", "3h 10m", "2d 4h": how long until a moment, for auction countdowns.
 export function timeLeft(until: Date, now: Date = new Date()): string {
   let s = Math.max(0, Math.floor((until.getTime() - now.getTime()) / 1000));

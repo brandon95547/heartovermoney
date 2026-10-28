@@ -42,8 +42,8 @@ export function BottomNav({ lastSection, postsHome }: { lastSection: Section; po
   );
 
   return (
-    <nav aria-label="Main" className={`fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)] ${dark ? "bg-black/80 text-white backdrop-blur" : "border-t border-line bg-paper text-ink"}`}>
-      <div className="mx-auto flex max-w-md items-stretch md:max-w-2xl">
+    <nav aria-label="Main" className={`fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md pb-[env(safe-area-inset-bottom)] md:max-w-2xl ${dark ? "bg-black/80 text-white backdrop-blur" : "border-t border-line bg-paper text-ink"}`}>
+      <div className="flex items-stretch">
         {item(home, "Home", House, pathname === home)}
         {item(posts ? "/search?in=posts" : "/search", "Search", Search, pathname === "/search")}
         {posts ? (
@@ -56,7 +56,7 @@ export function BottomNav({ lastSection, postsHome }: { lastSection: Section; po
           </Link>
         )}
         {item("/profile", "Profile", User, pathname.startsWith("/profile") || pathname === "/settings")}
-        {posts ? item("/chat", "Chat", MessageSquareMore, pathname === "/chat") : item("/cart", "Cart", ShoppingCart, pathname === "/cart")}
+        {posts ? item("/chat", "Chat", MessageSquareMore, pathname === "/chat" || pathname.startsWith("/chat/")) : item("/cart", "Cart", ShoppingCart, pathname === "/cart")}
       </div>
     </nav>
   );

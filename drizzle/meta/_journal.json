@@ -57,6 +57,13 @@
       "when": 1793152006547,
       "tag": "0007_photo_hashtags",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793199765828,
+      "tag": "0008_messenger",
+      "breakpoints": true
     }
   ]
 }

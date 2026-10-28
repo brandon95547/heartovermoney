@@ -206,7 +206,7 @@ function Done({ design, jokerChoice, ship, slug, code, qr, event, vipMember }: N
       {jokerChoice === "gift_card" && <p className="font-semibold">Your $20 gift card is ready to spend at the event.</p>}
       {!ship && (
         <div className="rounded-md bg-white p-4 text-ink">
-          <span className="block" dangerouslySetInnerHTML={{ __html: qr }} role="img" aria-label={`Check-in code ${code}`} />
+          <span className="block [&>svg]:mx-auto" dangerouslySetInnerHTML={{ __html: qr }} role="img" aria-label={`Check-in code ${code}`} />
           <p className="mt-2 font-mono text-sm font-bold">{code}</p>
           <p className="text-xs text-muted">Show this at the door. It&apos;s also in My Cards.</p>
         </div>

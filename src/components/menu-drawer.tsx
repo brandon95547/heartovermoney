@@ -29,7 +29,7 @@ export function MenuDrawer({ person, postsHref, tone = "light" }: { person: Menu
         <Menu className="size-6" strokeWidth={1.5} />
       </button>
       <dialog ref={dialog} aria-label="Menu" onClick={(e) => { if (e.target === dialog.current) close(); }}
-        className="m-0 h-dvh max-h-none w-[85%] max-w-sm bg-paper p-0 text-ink backdrop:bg-black/50 open:flex open:flex-col">
+        className="my-0 mr-0 ml-[max(0px,calc((100vw-28rem)/2))] h-dvh max-h-none w-[85%] max-w-sm bg-paper md:ml-[calc((100vw-42rem)/2)] p-0 text-ink backdrop:bg-black/50 open:flex open:flex-col">
         <div className="flex items-center gap-3 border-b border-line p-4">
           <Link href="/" onClick={close} aria-label="Heart Over Money home" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-ink">
             <Logo size={30} reversed />

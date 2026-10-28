@@ -8,8 +8,12 @@
 //   admin@heartovermoney.test   admin
 //   vip@heartovermoney.test     VIP, 700 Club member
 //   member@heartovermoney.test  member
+// The event's three registered guests, with conversations in the Connections Messenger:
+//   sarah@example.test, dolly@example.test, bryan@example.test
 //
-// Images are placeholders drawn here into public/placeholders/ until real artwork arrives.
+// Products and auction lots use the example pictures in public/examples/products, and posts those
+// in public/examples/posts; the rest (cities, films) are placeholders drawn here into
+// public/placeholders/ until real ones arrive.
 import fs from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
@@ -40,12 +44,16 @@ function placeholder(name: string, label: string, hue: number, w = 800, h = 1000
   return `/placeholders/${name}.svg`;
 }
 
+// A product's example pictures in public/examples/products (see its CREDITS.md): the piece, then
+// a detail of it.
+const product = (name: string) => [`/examples/products/${name}-1.webp`, `/examples/products/${name}-2.webp`];
+
 const day = 86_400_000;
 
 async function main() {
   // Wipe in one statement so foreign keys don't care about the order.
   await db.execute(rawSql`truncate table photo_downvotes, photo_likes, photos, order_items, orders, cart_items, bids, lots,
-    menu_items, provenance, editions, artworks, follows, artists, registrations, joker_timers, cards, films, events, cities,
+    menu_items, provenance, editions, artworks, follows, artists, messages, connections, registrations, joker_timers, cards, films, events, cities,
     password_resets, contact_messages, audit_log, site_content, users restart identity cascade`);
   fs.rmSync(PLACEHOLDERS, { recursive: true, force: true });
 
@@ -91,21 +99,21 @@ async function main() {
   const c = Object.fromEntries(cities.map((x) => [x.slug, x]));
 
   const art = [
-    ["jesus-multiplies", "Jesus Multiplies", "jesse-shane-fisher", "charlotte", "founders_art", 500000, 10, "JSF", 330],
-    ["charlotte-city-edition", "Charlotte City Edition", "jesse-shane-fisher", "charlotte", "print", 32500, 75, "JSF", 270],
-    ["charlotte-collector-edition", "Charlotte Collector Edition", "jesse-shane-fisher", "charlotte", "print", 125000, 25, "JSF", 290],
-    ["heart-over-money-tee", "Heart Over Money Tee", "jesse-shane-fisher", "charlotte", "merch", 3500, 1000, "JSF", 0],
-    ["good-news-shoes-charlotte", "Good News Shoes: Charlotte", "lovealways", "charlotte", "shoes", 12000, 250, "LA", 40],
-    ["queen-of-hearts", "Queen of Hearts", "lovealways", "charleston", "print", 150000, 50, "LA", 350],
-    ["harbor-light", "Harbor Light", "betty-w", "charleston", "print", 55000, 50, "BW", 190],
-    ["mission-bull", "Mission Bull", "matt-mailhott", "charleston", "founders_art", 550000, 5, "MM", 45],
-    ["white-light", "White Light", "nathan-marlow", "charleston", "print", 150000, 30, "NM", 210],
+    ["jesus-multiplies", "Jesus Multiplies", "jesse-shane-fisher", "charlotte", "founders_art", 500000, 10, "JSF"],
+    ["charlotte-city-edition", "Charlotte City Edition", "jesse-shane-fisher", "charlotte", "print", 32500, 75, "JSF"],
+    ["charlotte-collector-edition", "Charlotte Collector Edition", "jesse-shane-fisher", "charlotte", "print", 125000, 25, "JSF"],
+    ["heart-over-money-tee", "Heart Over Money Tee", "jesse-shane-fisher", "charlotte", "merch", 3500, 1000, "JSF"],
+    ["good-news-shoes-charlotte", "Good News Shoes: Charlotte", "lovealways", "charlotte", "shoes", 12000, 250, "LA"],
+    ["queen-of-hearts", "Queen of Hearts", "lovealways", "charleston", "print", 150000, 50, "LA"],
+    ["harbor-light", "Harbor Light", "betty-w", "charleston", "print", 55000, 50, "BW"],
+    ["mission-bull", "Mission Bull", "matt-mailhott", "charleston", "founders_art", 550000, 5, "MM"],
+    ["white-light", "White Light", "nathan-marlow", "charleston", "print", 150000, 30, "NM"],
   ] as const;
-  const artworks = await db.insert(s.artworks).values(art.map(([slug, title, artist, city, kind, price, size, prefix, hue]) => ({
+  const artworks = await db.insert(s.artworks).values(art.map(([slug, title, artist, city, kind, price, size, prefix]) => ({
     slug, title, artistId: a[artist].id, cityId: c[city].id, kind, priceCents: price, editionSize: size,
     certificatePrefix: prefix,
     description: `${title} is part of the ${c[city].name} collection: individually numbered, ${size} in the edition, never reprinted in this size or format. Each piece comes with a certificate of authenticity and a QR code to the ${c[city].name} story.`,
-    images: [placeholder(`${slug}-1`, title, hue), placeholder(`${slug}-2`, `${title} detail`, (hue + 30) % 360)],
+    images: product(slug),
   }))).returning();
   const w = Object.fromEntries(artworks.map((x) => [x.slug, x]));
 
@@ -159,18 +167,18 @@ async function main() {
   const lots = await db.insert(s.lots).values([
     { eventId: event.id, title: "Founders Edition Canvas", maker: "Jesse Shane Fisher",
       description: "An original canvas painted live at the Charlotte worship night. One of one.",
-      images: [placeholder("lot-founders-canvas", "Founders Canvas", 300), placeholder("lot-founders-canvas-2", "Canvas detail", 330)],
+      images: product("lot-founders-canvas"),
       quantityLabel: "1 original canvas", retailValueCents: 499900, buyNowCents: 222200, startingBidCents: 100000,
       auctionStartsAt: new Date(eventStart.getTime() + 60 * 60_000), auctionEndsAt: new Date(eventStart.getTime() + 2 * 60 * 60_000),
       vipUntil: new Date(Date.now() + 1 * day) },
     { eventId: event.id, title: "Collector Print Bundle", maker: "Betty W",
       description: "A bulk lot of 25 numbered Harbor Light prints, sold together to the winning bidder.",
-      images: [placeholder("lot-print-bundle", "Print Bundle (25)", 180)],
+      images: product("lot-print-bundle"),
       quantityLabel: "Bulk lot of 25", retailValueCents: 187500, buyNowCents: 100000, startingBidCents: 50000,
       auctionStartsAt: new Date(Date.now() - 60 * 60_000), auctionEndsAt: new Date(Date.now() + 2 * day) },
     { eventId: event.id, title: "Hand-painted Good News Shoes", maker: "LoveAlways",
       description: "One pair, painted by hand for this night. Size chosen with the winner.",
-      images: [placeholder("lot-shoes", "Hand-painted Shoes", 30)],
+      images: product("lot-shoes"),
       quantityLabel: "1 pair", retailValueCents: 60000, buyNowCents: 45000, startingBidCents: 20000, isArt: false,
       auctionStartsAt: new Date(eventStart.getTime() + 60 * 60_000), auctionEndsAt: new Date(eventStart.getTime() + 2 * 60 * 60_000) },
   ]).returning();
@@ -234,6 +242,26 @@ async function main() {
     { eventId: event.id, userId: u.BryanCho.id, cardId: firstOf("joker").id, jokerChoice: "kept" as const },
     { eventId: event.id, userId: u.DizzyDolly.id, cardId: firstOf("queen").id },
     { eventId: event.id, userId: u.sarah_parish.id, cardId: firstOf("rabbit").id, fulfillment: "ship" as const, shipAddress: "12 Elm Street, Charlotte, NC 28202" },
+  ]);
+
+  // Their conversations in the Connections Messenger. Bryan and Sarah have connected; Dolly
+  // has asked to connect with Sarah, who hasn't yet. Dolly's last message to Sarah is unread.
+  const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+  const msg = (from: string, to: string, minutes: number, body: string, read = true) =>
+    ({ eventId: event.id, senderId: u[from].id, recipientId: u[to].id, body, createdAt: ago(minutes), readAt: read ? ago(minutes - 1) : null });
+  await db.insert(s.messages).values([
+    msg("DizzyDolly", "BryanCho", 4 * 24 * 60, "Did you keep the Joker? I hear it's worth it."),
+    msg("BryanCho", "DizzyDolly", 4 * 24 * 60 - 12, "I kept it. Can't say more!"),
+    msg("BryanCho", "sarah_parish", 27 * 60, "Loved your post from the lawn. Which band was warming up?"),
+    msg("sarah_parish", "BryanCho", 26 * 60, "The choir from Tryon Street! They're singing again at the event."),
+    msg("sarah_parish", "DizzyDolly", 190, "Hi Dolly! Is this your first Art + Charity night too?"),
+    msg("DizzyDolly", "sarah_parish", 175, "My third! Fifty-one years married, and my husband still dances at every one."),
+    msg("DizzyDolly", "sarah_parish", 50, "Saving you a seat near the stage. Are you bringing anyone?", false),
+  ]);
+  await db.insert(s.connections).values([
+    { userId: u.BryanCho.id, otherId: u.sarah_parish.id, eventId: event.id },
+    { userId: u.sarah_parish.id, otherId: u.BryanCho.id, eventId: event.id },
+    { userId: u.DizzyDolly.id, otherId: u.sarah_parish.id, eventId: event.id },
   ]);
 
   // Films and stories. Without a video URL a film's page says it premieres soon.
