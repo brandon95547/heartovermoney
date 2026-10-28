@@ -29,8 +29,11 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
   if (!a) notFound();
   const film = await filmForCity(a.citySlug);
   // Art is VIP-only; anything not yet released is too, until its release (VIPs' early access).
+  // Anyone can still add it to the cart; the note says a membership is needed at checkout.
   const unreleased = !!a.releasesAt && a.releasesAt > new Date();
-  const gate = !needsVip(a.kind) && !unreleased ? undefined : !user ? "signin" : !user.isVip ? "vip" : undefined;
+  const vipNote = user?.isVip ? undefined
+    : needsVip(a.kind) ? "Art is for VIP members, from $25 a month: you'll need a membership at checkout."
+    : unreleased ? "Until its release, only VIP members can buy this drop." : undefined;
   const left = a.editionSize - a.sold;
   const soldOut = left <= 0;
 
@@ -49,7 +52,7 @@ async function ArtDetail({ params }: { params: PageProps<"/art/[slug]">["params"
           <h2 className="mt-2 text-lg font-semibold leading-snug">{a.title}</h2>
           <p className="text-sm">by <Link href={`/artists/${a.artistSlug}`} className="font-bold underline-offset-2 hover:underline">{a.artistName}</Link></p>
         </div>
-        <AddToCart slug={a.slug} soldOut={soldOut} gate={gate} early={unreleased && !needsVip(a.kind)} />
+        <AddToCart slug={a.slug} soldOut={soldOut} vipNote={vipNote} />
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div><dt className="text-xs text-muted">Edition</dt><dd className="font-semibold">{a.editionSize} pieces</dd></div>
           <div><dt className="text-xs text-muted">Available</dt><dd className="font-semibold">{soldOut ? "None, never reprinted" : `${left} of ${a.editionSize}`}</dd></div>

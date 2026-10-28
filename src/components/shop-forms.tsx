@@ -14,30 +14,19 @@ function Message({ state }: { state: ActionState }) {
   return null;
 }
 
-// `gate`: the piece is art, which only VIPs can buy. A visitor who isn't signed in is sent to
-// sign in first, and a member who isn't a VIP to Membership; either way they come back here.
-export function AddToCart({ slug, soldOut, gate, early = false }: { slug: string; soldOut: boolean; gate?: "signin" | "vip"; early?: boolean }) {
+// Add to cart, as in the design, for everyone: signing in (and, for art, a VIP membership) is
+// only needed at checkout. `vipNote` says so under the button when it applies.
+export function AddToCart({ slug, soldOut, vipNote }: { slug: string; soldOut: boolean; vipNote?: string }) {
   const [state, action, pending] = useActionState(addToCart, undefined);
-  if (gate && !soldOut) {
-    const back = `/art/${slug}`;
-    return (
-      <div>
-        {gate === "signin"
-          ? <Link href={withNext("/signin", back)} className={buttonClass("primary", "w-52")}>Sign in to buy</Link>
-          : <Link href={withNext("/membership", back)} className={buttonClass("primary", "w-52")}>Become a VIP to buy</Link>}
-        <p className="mt-2 text-sm text-muted">
-          {early ? "VIP members can buy this drop before its release." : "Art is for VIP members."}{" "}
-          {gate === "signin" ? "Sign in, or create an account, then choose a membership from $25 a month." : "Membership starts at $25 a month, and brings you back here."}
-        </p>
-      </div>
-    );
-  }
   return (
     <form action={action}>
       <input type="hidden" name="slug" value={slug} />
       <button disabled={soldOut || pending} className={buttonClass("primary", "w-44")}>
         {soldOut ? "Sold out" : pending ? "Adding…" : "Add to cart"}
       </button>
+      {vipNote && !soldOut && (
+        <p className="mt-2 text-sm text-muted">{vipNote} <Link href={withNext("/membership", `/art/${slug}`)} className="font-semibold text-vip underline">See memberships</Link></p>
+      )}
       <Message state={state} />
     </form>
   );
@@ -80,11 +69,18 @@ export function LotActions({ lotId, canBuyNow, canBid, minBidDollars, buyNowLabe
   );
 }
 
-export function CheckoutForm({ totalLabel, defaultAddress }: { totalLabel: string; defaultAddress: string }) {
+// `guest`: not signed in, so the form asks for an email for the receipt (checkout as a guest).
+export function CheckoutForm({ totalLabel, defaultAddress, guest = false }: { totalLabel: string; defaultAddress: string; guest?: boolean }) {
   const [state, action, pending] = useActionState(checkout, undefined);
   const [ship, setShip] = useState(false);
   return (
     <form action={action} className="space-y-4">
+      {guest && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted">Email for your receipt</span>
+          <input name="email" type="email" autoComplete="email" required className="h-12 w-full rounded-md bg-fog px-4 text-sm outline-none focus:ring-2 focus:ring-ink/20" />
+        </label>
+      )}
       <fieldset className="grid grid-cols-2 gap-3">
         <legend className="sr-only">How you&apos;ll receive it</legend>
         {[["pickup", "Claim at the event"], ["ship", "Ship to me"]].map(([v, label]) => (

@@ -3,6 +3,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
+import { moveGuestCartTo } from "@/lib/guest-cart";
 
 const COOKIE = "hom_session";
 const DAYS = 30;
@@ -18,6 +19,8 @@ export async function createSession(userId: string) {
   (await cookies()).set(COOKIE, token, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", expires,
   });
+  // Whatever they put in the cart before signing in comes with them.
+  await moveGuestCartTo(userId);
 }
 
 export async function deleteSession() {

@@ -284,16 +284,28 @@ export async function clubSeatsTaken() {
   return n;
 }
 
+const cartFields = {
+  artworkId: s.artworks.id, slug: s.artworks.slug, title: s.artworks.title, images: s.artworks.images,
+  priceCents: s.artworks.priceCents, editionSize: s.artworks.editionSize, kind: s.artworks.kind, releasesAt: s.artworks.releasesAt,
+  artistName: s.artists.name, sold: soldCount,
+};
+
 export async function getCart(userId: string) {
   await connection();
-  return db.select({
-    artworkId: s.artworks.id, slug: s.artworks.slug, title: s.artworks.title, images: s.artworks.images,
-    priceCents: s.artworks.priceCents, editionSize: s.artworks.editionSize, quantity: s.cartItems.quantity,
-    artistName: s.artists.name, sold: soldCount,
-  }).from(s.cartItems)
+  return db.select({ ...cartFields, quantity: s.cartItems.quantity }).from(s.cartItems)
     .innerJoin(s.artworks, eq(s.artworks.id, s.cartItems.artworkId))
     .innerJoin(s.artists, eq(s.artists.id, s.artworks.artistId))
     .where(eq(s.cartItems.userId, userId)).orderBy(asc(s.artworks.title));
+}
+
+// A visitor's cart (from the cookie), in the same shape as an account's.
+export async function getGuestCart(lines: { artworkId: string; quantity: number }[]) {
+  await connection();
+  if (!lines.length) return [];
+  const rows = await db.select(cartFields).from(s.artworks)
+    .innerJoin(s.artists, eq(s.artists.id, s.artworks.artistId))
+    .where(inArray(s.artworks.id, lines.map((l) => l.artworkId))).orderBy(asc(s.artworks.title));
+  return rows.map((r) => ({ ...r, quantity: lines.find((l) => l.artworkId === r.artworkId)!.quantity }));
 }
 
 export async function listOrders(userId: string) {

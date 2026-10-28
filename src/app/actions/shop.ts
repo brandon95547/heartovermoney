@@ -1,18 +1,25 @@
 "use server";
 
 // Buying: the cart, checkout, Buy Now and bids. Payment is simulated (orders are marked paid)
-// until Stripe test keys are configured. Every action checks the signed-in user itself.
-import { and, eq, sql } from "drizzle-orm";
+// until Stripe test keys are configured. Every action checks who is buying itself.
+import bcrypt from "bcryptjs";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import { db, schema as s } from "@/db";
 import { getUser } from "@/lib/dal";
 import { certificateCode } from "@/lib/certificates";
+import { readGuestCart, writeGuestCart } from "@/lib/guest-cart";
 import { needsVip } from "@/lib/membership";
+import { createSession } from "@/lib/session";
+import { newUsername } from "@/lib/usernames";
 
 export type ActionState = { error?: string; ok?: string } | undefined;
 
 const VIP_ONLY = "Art is for VIP members. Become a VIP from $25 a month.";
+const GUEST_VIP_ONLY = "Art and early drops are for VIP members. Sign in as a VIP to check out.";
 // Before a drop's release date, VIPs buy it early (the Collector Club's early access).
 const EARLY_ACCESS_ONLY = "This drop isn't released yet. VIP members can buy it early.";
 // The auction's rules (development overview page 6, and the client's "art is VIP only"): Buy
@@ -27,36 +34,72 @@ async function signedIn(next: string) {
   return user;
 }
 
+// Anyone can add to the cart, signed in or not (a visitor's cart is a cookie until they sign in
+// or check out). Who may buy what (VIP-only art, early access) is checked at checkout.
 export async function addToCart(_: ActionState, form: FormData): Promise<ActionState> {
   const slug = String(form.get("slug") ?? "");
-  const user = await signedIn(`/art/${slug}`);
-  const [piece] = await db.select({ id: s.artworks.id, size: s.artworks.editionSize, kind: s.artworks.kind, releasesAt: s.artworks.releasesAt })
+  const [piece] = await db.select({ id: s.artworks.id, size: s.artworks.editionSize })
     .from(s.artworks).where(eq(s.artworks.slug, slug)).limit(1);
   if (!piece) return { error: "That piece no longer exists." };
-  if (needsVip(piece.kind) && !user.isVip) return { error: VIP_ONLY };
-  if (!user.isVip && piece.releasesAt && piece.releasesAt > new Date()) return { error: EARLY_ACCESS_ONLY };
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(s.editions).where(eq(s.editions.artworkId, piece.id));
   if (n >= piece.size) return { error: "This edition is sold out. It will never be reprinted." };
-  await db.insert(s.cartItems).values({ userId: user.id, artworkId: piece.id, quantity: 1 })
-    .onConflictDoUpdate({ target: [s.cartItems.userId, s.cartItems.artworkId], set: { quantity: sql`${s.cartItems.quantity} + 1` } });
+  const user = await getUser();
+  if (user) {
+    await db.insert(s.cartItems).values({ userId: user.id, artworkId: piece.id, quantity: 1 })
+      .onConflictDoUpdate({ target: [s.cartItems.userId, s.cartItems.artworkId], set: { quantity: sql`least(${s.cartItems.quantity} + 1, 10)` } });
+  } else {
+    const lines = await readGuestCart();
+    const line = lines.find((l) => l.artworkId === piece.id);
+    if (line) line.quantity = Math.min(10, line.quantity + 1);
+    else lines.push({ artworkId: piece.id, quantity: 1 });
+    await writeGuestCart(lines);
+  }
   redirect("/cart");
 }
 
 export async function setCartQuantity(form: FormData) {
-  const user = await signedIn("/cart");
   const artworkId = String(form.get("artworkId") ?? "");
   const quantity = Math.max(0, Math.min(10, Number(form.get("quantity")) || 0));
-  const where = and(eq(s.cartItems.userId, user.id), eq(s.cartItems.artworkId, artworkId));
-  if (quantity === 0) await db.delete(s.cartItems).where(where);
-  else await db.update(s.cartItems).set({ quantity }).where(where);
+  const user = await getUser();
+  if (user) {
+    const where = and(eq(s.cartItems.userId, user.id), eq(s.cartItems.artworkId, artworkId));
+    if (quantity === 0) await db.delete(s.cartItems).where(where);
+    else await db.update(s.cartItems).set({ quantity }).where(where);
+  } else {
+    await writeGuestCart((await readGuestCart()).map((l) => (l.artworkId === artworkId ? { ...l, quantity } : l)));
+  }
   revalidatePath("/cart");
 }
 
+// A guest checking out gives only an email. The order is kept under an account for that email
+// (no password; "Forgot details?" sets one), so their order page, certificates and vault work
+// as anyone's. An email that already has an account has to sign in instead.
+async function guestBuyer(form: FormData, shipAddress: string | null): Promise<{ id: string; isVip: boolean } | { error: string }> {
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  if (!z.email().safeParse(email).success) return { error: "Enter your email for the receipt." };
+  const [existing] = await db.select({ id: s.users.id }).from(s.users).where(eq(s.users.email, email)).limit(1);
+  if (existing) return { error: "There's already an account with this email. Sign in to check out." };
+  const lines = await readGuestCart();
+  const pieces = lines.length ? await db.select({ kind: s.artworks.kind, releasesAt: s.artworks.releasesAt }).from(s.artworks)
+    .where(inArray(s.artworks.id, lines.map((l) => l.artworkId))) : [];
+  if (!pieces.length) return { error: "Your cart is empty." };
+  if (pieces.some((p) => needsVip(p.kind) || (p.releasesAt && p.releasesAt > new Date()))) return { error: GUEST_VIP_ONLY };
+  const username = await newUsername(email);
+  const [created] = await db.insert(s.users).values({
+    email, username, displayName: username, shipAddress,
+    passwordHash: await bcrypt.hash(randomBytes(32).toString("hex"), 10),
+  }).returning({ id: s.users.id });
+  await createSession(created.id); // which also moves the cart into the new account
+  return { id: created.id, isVip: false };
+}
+
 export async function checkout(_: ActionState, form: FormData): Promise<ActionState> {
-  const user = await signedIn("/cart");
   const fulfillment = form.get("fulfillment") === "ship" ? "ship" : "pickup";
   const shipAddress = String(form.get("address") ?? "").trim();
   if (fulfillment === "ship" && shipAddress.length < 10) return { error: "Enter the full shipping address." };
+  const buyer = (await getUser()) ?? (await guestBuyer(form, fulfillment === "ship" ? shipAddress : null));
+  if ("error" in buyer) return buyer;
+  const user = buyer;
 
   let orderId: string;
   try {

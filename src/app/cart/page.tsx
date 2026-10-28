@@ -5,9 +5,12 @@ import { ArtImage } from "@/components/art-image";
 import { CheckoutForm } from "@/components/shop-forms";
 import { Empty, PageHeader, Skeleton, buttonClass } from "@/components/ui";
 import { setCartQuantity } from "@/app/actions/shop";
-import { requireUser } from "@/lib/dal";
+import { getUser } from "@/lib/dal";
+import { readGuestCart } from "@/lib/guest-cart";
+import { needsVip } from "@/lib/membership";
+import { withNext } from "@/lib/next-path";
 import { money } from "@/lib/format";
-import { getCart } from "@/lib/queries";
+import { getCart, getGuestCart } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Cart" };
 
@@ -20,9 +23,11 @@ export default function CartPage() {
   );
 }
 
+// Open to everyone: a visitor's cart comes from its cookie, and checkout works as a guest, except
+// for art and early drops, which need a VIP to sign in.
 async function Cart() {
-  const user = await requireUser("/cart");
-  const items = await getCart(user.id);
+  const user = await getUser();
+  const items = user ? await getCart(user.id) : await getGuestCart(await readGuestCart());
   if (!items.length) {
     return (
       <div className="space-y-4 p-5">
@@ -32,6 +37,8 @@ async function Cart() {
     );
   }
   const total = items.reduce((t, i) => t + i.priceCents * i.quantity, 0);
+  const now = new Date();
+  const vipOnly = items.some((i) => needsVip(i.kind) || (i.releasesAt && i.releasesAt > now));
   return (
     <div className="space-y-6 p-5">
       <ul className="divide-y divide-line">
@@ -57,7 +64,20 @@ async function Cart() {
       <div className="flex justify-between border-t border-line pt-4 text-lg font-bold">
         <span>Total</span><span>{money(total, { cents: true })}</span>
       </div>
-      <CheckoutForm totalLabel={money(total)} defaultAddress={user.shipAddress ?? ""} />
+      {user ? (
+        <CheckoutForm totalLabel={money(total)} defaultAddress={user.shipAddress ?? ""} />
+      ) : vipOnly ? (
+        <div className="space-y-3 text-center">
+          <p className="text-sm text-muted">Art and early drops are for VIP members. Sign in as a VIP to check out, or become one from $25 a month.</p>
+          <Link href={withNext("/signin", "/cart")} className={buttonClass("black", "w-full")}>Sign in to check out</Link>
+          <Link href={withNext("/membership", "/cart")} className="block text-sm font-semibold text-vip underline">See memberships</Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-center text-sm">Have an account? <Link href={withNext("/signin", "/cart")} className="font-semibold underline">Sign in</Link>, or check out as a guest.</p>
+          <CheckoutForm totalLabel={money(total)} defaultAddress="" guest />
+        </div>
+      )}
       <Link href="/" className="block text-center text-sm font-semibold underline">Continue shopping</Link>
     </div>
   );
