@@ -19,6 +19,8 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+  /* No double-tap zoom either (see components/no-zoom.tsx). */
+  touch-action: manipulation;
 }
 
 body {
