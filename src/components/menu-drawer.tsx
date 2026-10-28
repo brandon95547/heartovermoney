@@ -1,12 +1,12 @@
 "use client";
 
 // The site menu behind ☰ (the blueprint's secondary navigation, laid out like screen design
-// page 16): the mark and a search field at the top, the sections of the site, and the person
-// signed in at the bottom. A native <dialog>, so Escape closes it and focus stays inside.
+// page 16): the mark at the top, the sections of the site, and the person signed in at the
+// bottom. A native <dialog>, so Escape closes it and focus stays inside.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef } from "react";
-import { ChevronRight, Menu, Search, X } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 export type MenuPerson = { displayName: string; tagline: string | null; isVip: boolean } | null;
@@ -30,15 +30,10 @@ export function MenuDrawer({ person, postsHref, tone = "light" }: { person: Menu
       </button>
       <dialog ref={dialog} aria-label="Menu" onClick={(e) => { if (e.target === dialog.current) close(); }}
         className="my-0 mr-0 ml-[max(0px,calc((100vw-28rem)/2))] h-dvh max-h-none w-[85%] max-w-sm bg-paper md:ml-[calc((100vw-42rem)/2)] p-0 text-ink backdrop:bg-black/50 open:flex open:flex-col">
-        <div className="flex items-center gap-3 border-b border-line p-4">
+        <div className="flex items-center justify-between border-b border-line p-4">
           <Link href="/" onClick={close} aria-label="Heart Over Money home" className="flex h-11 shrink-0 items-center">
             <Logo size={40} />
           </Link>
-          <form action="/search" role="search" onSubmit={close} className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input name="q" placeholder="Search art, artists, cities" aria-label="Search"
-              className="h-11 w-full rounded-md bg-fog pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ink/20" />
-          </form>
           <button type="button" onClick={close} aria-label="Close menu" className="flex size-9 items-center justify-center rounded-full hover:bg-fog">
             <X className="size-5" strokeWidth={1.5} />
           </button>
