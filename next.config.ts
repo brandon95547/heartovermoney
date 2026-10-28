@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
-  // The development badge sits at the top, clear of the bottom navigation.
-  devIndicators: { position: "top-right" },
+  // No development badge: wherever it sits it covers a control (the bottom navigation, the
+  // back arrow, or Profile's settings gear). Build errors still show in the overlay.
+  devIndicators: false,
   partialPrefetching: true,
   // Lots moved from /auction/:id to /auctions/:id, beside the new Auctions page.
   async redirects() {

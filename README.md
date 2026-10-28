@@ -44,17 +44,28 @@ mail the reset link is in the log.
 | Auctions | All lots by phase (`/auctions`), and a lot (`/auctions/[id]`): VIP early Buy Now before the event, then live bidding. `/auction/[id]` redirects there |
 | The next event | `/events`, the link on the cards handed out: sign in, pick the collector card you'll get at the door, the Joker's game (timed on the server), a line about yourself (with a VIP upgrade for non-VIPs), then the door or the mail, and a QR code for the door |
 | Events | Overview (with the contract's terms and documents), Details (Tonight's Scoreboard), photo wall (share, download), posting a photo, food and drink |
-| Posts | `/posts`: every event's photos, the Home of the Posts side. People can thumbs-down a photo (five take it off the wall); admins can remove one, and restore removed photos at `/admin/photos` |
+| Posts | The current event's Overview (`/posts` redirects there): its posts are photos attached to the event, with hashtags. People can thumbs-down a photo (five take it off the wall); admins can remove one, and restore removed photos at `/admin/photos` |
 | Collecting | Vault, certificates of authenticity (`/certificates/[code]`): a public check that a piece is genuine, with its ownership record; the owner's name shows only to the owner |
 | Stories | Films (`/films`, `/films/[slug]`), The mission, About, Contact |
 | Account | Sign in and up, Forgot details (`/reset-password`), Profile, My cards (`/profile/cards`), Settings (shipping address, email updates, password), Membership, Search with filters |
 | Admin | `/admin`, for accounts with the admin role (see below) |
-| Later | Chat (the Connections Messenger) has a placeholder page |
+| Posts: Chat | `/chat`, the Connections Messenger: the attendee list (guests who allow it in Settings); messaging itself is next |
 
-Navigation: the bottom bar is icons only, as in the designs (Posts side: ♥ and Chat;
-Products side: $ and Cart; the center opens Vault, Posts, Products and Settings). ☰ on the
-Products home and the Posts feed opens the site menu (Collections, Auctions, Membership, the
-next event, Posts, Films, The mission, About, Contact).
+Navigation (agreed with the client, October 2026): the site has two sections. **Products**
+(home `/`, art, artists, collections, auctions, cart) shows Home · Search · ♥ · Profile · Cart;
+**Posts** (events and Chat) shows Home · Search · $ · Profile · Chat. Posts' homepage is the
+current event's Overview (design page 10): a "post" is a photo attached to an event, shown as a
+thumbnail down its left side (with + on top to post one, when signed in) and full screen on the
+event's photo wall (page 9), with the poster's hashtags. `/posts` redirects to it. The center icon is
+the way to the other section (♥ to Posts, $ back to Products); Home goes to the current
+section's homepage; Search searches the current section (`/search?in=posts` on Posts). Pages
+shared by both (Profile, Settings, the Vault, the stories) keep the section the visitor came
+from (`hom_section` cookie). Nothing opens above the bar. Settings are behind the gear on
+Profile. Chat opens the Connections Messenger for guests registered for the next event; a
+visitor who isn't signed in is offered sign in, and one who isn't registered goes through the
+card process first, which ends at the Messenger. ☰ on the Products home and the Posts feed
+opens the site menu (Collections, Auctions, Membership, the next event, Posts, Films, The
+mission, About, Contact).
 
 One event runs at a time; `/events` always means the next one. Any membership (from $25 a
 month) makes someone a VIP. Only VIPs can buy fine art (prints and founders' art); a guest who

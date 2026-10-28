@@ -3,10 +3,14 @@
 import { Menu } from "lucide-react";
 import { MenuDrawer } from "@/components/menu-drawer";
 import { getUser } from "@/lib/dal";
+import { getNextEvent } from "@/lib/queries";
 
 export async function SiteMenu({ tone = "light" }: { tone?: "light" | "dark" }) {
-  const user = await getUser();
-  return <MenuDrawer tone={tone} person={user && { displayName: user.displayName, tagline: user.tagline, isVip: user.isVip }} />;
+  const [user, event] = await Promise.all([getUser(), getNextEvent()]);
+  return (
+    <MenuDrawer tone={tone} postsHref={event ? `/events/${event.slug}` : "/events"}
+      person={user && { displayName: user.displayName, tagline: user.tagline, isVip: user.isVip }} />
+  );
 }
 
 export function SiteMenuFallback({ tone = "light" }: { tone?: "light" | "dark" }) {

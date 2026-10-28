@@ -1,0 +1,1 @@
+ALTER TABLE "photos" ADD COLUMN "hashtags" jsonb DEFAULT '[]'::jsonb NOT NULL;

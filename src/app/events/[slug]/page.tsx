@@ -1,12 +1,16 @@
-// Event overview (screen design page 10; development overview page 4): photos posted live
-// down the left, the event contract's progress, its story, terms and documents, the way in to
-// register, and the city's collection. Swipe right to left for the details.
+// Event overview (screen design page 10; development overview page 4), and the Posts
+// section's homepage for the current event (the client, October 2026). Down the left, the
+// posts: photos attached to the event, each opening full screen on the photo wall (page 9),
+// with + on top for a signed-in guest to post one. Beside them, the event contract's progress,
+// its story, terms and documents, the way in to register, and the city's collection. Swipe right
+// to left for the details.
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ChevronRight, FileText } from "lucide-react";
+import { ChevronRight, FileText, Plus } from "lucide-react";
 import { ArtImage } from "@/components/art-image";
 import { AutoRefresh, SwipeTo } from "@/components/event-client";
+import { SiteMenu, SiteMenuFallback } from "@/components/site-menu";
 import { PageHeader, ProgressBar, Skeleton, buttonClass } from "@/components/ui";
 import { CARD_DESIGNS } from "@/lib/cards";
 import { getUser } from "@/lib/dal";
@@ -16,7 +20,7 @@ import { EventHeading } from "./event-heading";
 export default function EventOverviewPage(props: PageProps<"/events/[slug]">) {
   return (
     <main>
-      <PageHeader title="Overview" back="/posts" />
+      <PageHeader title="Overview" left={<Suspense fallback={<SiteMenuFallback />}><SiteMenu /></Suspense>} />
       <Suspense fallback={<Skeleton className="m-5 h-96" />}><Overview params={props.params} /></Suspense>
     </main>
   );
@@ -42,7 +46,15 @@ async function Overview({ params }: { params: PageProps<"/events/[slug]">["param
     <SwipeTo href={`/events/${slug}/details`}>
       <AutoRefresh seconds={15} />
       <div className="grid grid-cols-[6.5rem_1fr] gap-4 p-4">
-        <ul className="space-y-2" aria-label="Latest photos">
+        <ul className="space-y-2" aria-label="Posts">
+          {user && (
+            <li>
+              <Link href={`/events/${slug}/photos/new`} aria-label="Post a photo to this event" title="Post a photo"
+                className="flex aspect-square items-center justify-center rounded-sm border-2 border-dashed border-ink/40 text-ink hover:border-ink hover:bg-fog">
+                <Plus className="size-8" strokeWidth={1.5} />
+              </Link>
+            </li>
+          )}
           {photos.slice(0, 6).map((p) => (
             <li key={p.id}>
               <Link href={`/events/${slug}/photos#${p.id}`} className="relative block aspect-square overflow-hidden rounded-sm bg-mist">

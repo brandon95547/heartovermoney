@@ -183,7 +183,8 @@ export async function listEventSales(eventId: string) {
   await connection();
   return db.select({
     id: s.orderItems.id, label: s.orderItems.label, quantity: s.orderItems.quantity, unitPriceCents: s.orderItems.unitPriceCents,
-    buyer: s.users.username, buyerRole: s.users.role, buyerTier: s.users.membershipTier, createdAt: s.orders.createdAt, kind: s.orders.kind,
+    buyer: s.users.username, buyerRole: s.users.role, buyerTier: s.users.membershipTier, buyerShown: s.users.showOnScoreboard,
+    createdAt: s.orders.createdAt, kind: s.orders.kind,
     soldBy: sql<string>`coalesce(${s.artists.name}, ${s.lots.maker}, 'Heart Over Money')`,
     artSlug: s.artworks.slug, lotId: s.lots.id,
   }).from(s.orderItems)
@@ -201,7 +202,7 @@ export async function listEventSales(eventId: string) {
 export async function listPhotos(eventId: string | null, viewerId?: string) {
   await connection();
   return db.select({
-    id: s.photos.id, image: s.photos.image, caption: s.photos.caption, createdAt: s.photos.createdAt,
+    id: s.photos.id, image: s.photos.image, caption: s.photos.caption, hashtags: s.photos.hashtags, createdAt: s.photos.createdAt,
     userId: s.photos.userId, username: s.users.username,
     eventSlug: s.events.slug, eventTitle: s.events.title, eventStartsAt: s.events.startsAt, cityName: s.cities.name,
     likes: sql<number>`(select count(*)::int from ${s.photoLikes} where ${s.photoLikes.photoId} = ${s.photos.id})`,
@@ -302,8 +303,8 @@ export async function listOrders(userId: string) {
 
 export type SearchFilters = { available?: boolean; type?: "art" | "merch" | "shoes" };
 
-// Search across the site. `available` leaves out sold-out pieces; `type` narrows the art to
-// fine art (prints and founders art), merch or shoes.
+// Products search: art, auction lots, collections and artists. `available` leaves out sold-out
+// pieces; `type` narrows the art to fine art (prints and founders art), merch or shoes.
 export async function search(term: string, filters: SearchFilters = {}) {
   await connection();
   const like = `%${term.replace(/[%_]/g, "")}%`;
@@ -311,7 +312,7 @@ export async function search(term: string, filters: SearchFilters = {}) {
   if (filters.available) artWhere.push(sql`${soldCount} < ${s.artworks.editionSize}`);
   if (filters.type === "art") artWhere.push(inArray(s.artworks.kind, ["print", "founders_art"]));
   if (filters.type === "merch" || filters.type === "shoes") artWhere.push(eq(s.artworks.kind, filters.type));
-  const [artworks, lots, cities, artists, events, films] = await Promise.all([
+  const [artworks, lots, cities, artists] = await Promise.all([
     db.select(artworkCard).from(s.artworks)
       .innerJoin(s.artists, eq(s.artists.id, s.artworks.artistId))
       .innerJoin(s.cities, eq(s.cities.id, s.artworks.cityId))
@@ -320,14 +321,8 @@ export async function search(term: string, filters: SearchFilters = {}) {
       filters.available ? eq(s.lots.status, "open") : undefined)).limit(10),
     db.select().from(s.cities).where(ilike(s.cities.name, like)).limit(10),
     db.select({ slug: s.artists.slug, name: s.artists.name }).from(s.artists).where(ilike(s.artists.name, like)).limit(10),
-    db.select({ slug: s.events.slug, title: s.events.title, startsAt: s.events.startsAt, cityName: s.cities.name })
-      .from(s.events).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
-      .where(or(ilike(s.events.title, like), ilike(s.cities.name, like))).limit(10),
-    db.select({ slug: s.films.slug, title: s.films.title, kind: s.films.kind }).from(s.films)
-      .leftJoin(s.cities, eq(s.cities.id, s.films.cityId))
-      .where(or(ilike(s.films.title, like), ilike(s.cities.name, like))).limit(10),
   ]);
-  return { artworks, lots, cities, artists, events, films };
+  return { artworks, lots, cities, artists };
 }
 
 export async function getArtist(slug: string, viewerId?: string) {
@@ -373,4 +368,37 @@ export async function filmForCity(citySlug: string) {
     .from(s.films).innerJoin(s.cities, eq(s.cities.id, s.films.cityId)).where(eq(s.cities.slug, citySlug))
     .orderBy(sql`${s.films.kind} = 'music_video' desc`, desc(s.films.publishedAt)).limit(1);
   return row ?? null;
+}
+
+// Posts search: photos on the walls (by caption, poster or city), events and films.
+export async function searchPosts(term: string) {
+  await connection();
+  const like = `%${term.replace(/[%_]/g, "")}%`;
+  const [photos, events, films] = await Promise.all([
+    db.select({
+      id: s.photos.id, image: s.photos.image, caption: s.photos.caption, username: s.users.username,
+      eventSlug: s.events.slug, eventTitle: s.events.title, cityName: s.cities.name,
+    }).from(s.photos).innerJoin(s.users, eq(s.users.id, s.photos.userId))
+      .innerJoin(s.events, eq(s.events.id, s.photos.eventId)).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+      .where(and(isNull(s.photos.removedAt), or(ilike(s.photos.caption, like), ilike(s.users.username, like), ilike(s.cities.name, like),
+        ilike(s.events.title, like), sql`${s.photos.hashtags}::text ilike ${`%${term.replace(/^#/, "").replace(/[%_]/g, "")}%`}`)))
+      .orderBy(desc(s.photos.createdAt)).limit(30),
+    db.select({ slug: s.events.slug, title: s.events.title, startsAt: s.events.startsAt, cityName: s.cities.name })
+      .from(s.events).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
+      .where(or(ilike(s.events.title, like), ilike(s.cities.name, like), ilike(s.events.venue, like))).limit(10),
+    db.select({ slug: s.films.slug, title: s.films.title, kind: s.films.kind }).from(s.films)
+      .leftJoin(s.cities, eq(s.cities.id, s.films.cityId))
+      .where(or(ilike(s.films.title, like), ilike(s.films.summary, like), ilike(s.cities.name, like))).limit(10),
+  ]);
+  return { photos, events, films };
+}
+
+// An event's attendee list for the Connections Messenger: the other registered guests who
+// chose to be listed (Settings), with the line about themselves from the card process.
+export async function listAttendees(eventId: string, exceptUserId: string) {
+  await connection();
+  return db.select({ id: s.users.id, displayName: s.users.displayName, username: s.users.username, tagline: s.users.tagline })
+    .from(s.registrations).innerJoin(s.users, eq(s.users.id, s.registrations.userId))
+    .where(and(eq(s.registrations.eventId, eventId), eq(s.users.listedAsAttendee, true), sql`${s.users.id} <> ${exceptUserId}`))
+    .orderBy(asc(s.registrations.createdAt));
 }

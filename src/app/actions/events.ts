@@ -10,6 +10,7 @@ import { db, schema as s } from "@/db";
 import { CARD_DESIGNS, type CardDesign } from "@/lib/cards";
 import { getUser } from "@/lib/dal";
 import { checkInQr } from "@/lib/check-in";
+import { parseHashtags } from "@/lib/hashtags";
 import { saveUpload, uploadProblem } from "@/lib/uploads";
 
 export type EventActionState = { error?: string } | undefined;
@@ -122,7 +123,7 @@ export async function toggleLike(photoId: string, eventSlug: string) {
   if (existing) await db.delete(s.photoLikes).where(where);
   else await db.insert(s.photoLikes).values({ photoId, userId: user.id }).onConflictDoNothing();
   revalidatePath(`/events/${eventSlug}/photos`);
-  revalidatePath("/posts");
+  revalidatePath(`/events/${eventSlug}`);
 }
 
 // Moderating the wall (the client: "admin rights to remove", and "the community of users the
@@ -133,13 +134,12 @@ const REMOVE_AFTER_DOWNVOTES = 5;
 function refreshWalls(eventSlug: string) {
   revalidatePath(`/events/${eventSlug}/photos`);
   revalidatePath(`/events/${eventSlug}`);
-  revalidatePath("/posts");
 }
 
 export async function toggleDownvote(photoId: string, eventSlug: string) {
   if (!isId(photoId)) return;
   const user = await getUser();
-  if (!user) redirect(`/signin?next=${encodeURIComponent("/posts")}`);
+  if (!user) redirect(`/signin?next=${encodeURIComponent(`/events/${eventSlug}/photos`)}`);
   const [photo] = await db.select({ userId: s.photos.userId }).from(s.photos).where(eq(s.photos.id, photoId)).limit(1);
   if (!photo || photo.userId === user.id) return;
   const where = and(eq(s.photoDownvotes.photoId, photoId), eq(s.photoDownvotes.userId, user.id));
@@ -196,7 +196,8 @@ export async function postPhoto(_: EventActionState, form: FormData): Promise<Ev
 
   const image = await saveUpload(file);
   const caption = String(form.get("caption") ?? "").trim().slice(0, 200);
-  await db.insert(s.photos).values({ eventId: event.id, userId: user.id, image, caption });
+  await db.insert(s.photos).values({ eventId: event.id, userId: user.id, image, caption, hashtags: parseHashtags(form.get("hashtags")) });
+  refreshWalls(slug);
   redirect(`/events/${slug}/photos`);
 }
 

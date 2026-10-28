@@ -203,15 +203,15 @@ async function main() {
   }
 
   const captions = [
-    ["sarah_parish", "Worship on the steps before the doors opened", 330],
-    ["FredMack", "The founders canvas, half finished", 20],
-    ["DizzyDolly", "First look at the Charlotte collection", 280],
-    ["JasonMackMiller", "Choir from the church on Tryon Street", 200],
-    ["MonicaBarkley", "Barbecue line, as long as the art line", 40],
-    ["BryanCho", "Edition 1 of the collector print", 260],
+    ["sarah_parish", "Worship on the steps before the doors opened", 330, ["worship", "healing", "love"]],
+    ["FredMack", "The founders canvas, half finished", 20, ["art", "happenings"]],
+    ["DizzyDolly", "First look at the Charlotte collection", 280, ["art", "exhibitjoy"]],
+    ["JasonMackMiller", "Choir from the church on Tryon Street", 200, ["worship", "choir"]],
+    ["MonicaBarkley", "Barbecue line, as long as the art line", 40, ["happenings"]],
+    ["BryanCho", "Edition 1 of the collector print", 260, ["art", "collector"]],
   ] as const;
-  const photos = await db.insert(s.photos).values(captions.map(([username, caption, hue], i) => ({
-    eventId: event.id, userId: u[username].id, caption,
+  const photos = await db.insert(s.photos).values(captions.map(([username, caption, hue, hashtags], i) => ({
+    eventId: event.id, userId: u[username].id, caption, hashtags: [...hashtags],
     image: placeholder(`photo-${i + 1}`, caption.split(" ").slice(0, 3).join(" "), hue, 900, 1600),
     createdAt: new Date(Date.now() - (captions.length - i) * 7 * 60_000),
   }))).returning();

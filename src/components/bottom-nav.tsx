@@ -1,42 +1,46 @@
 "use client";
 
-// The bottom navigation (screen design page 27). Icons only, as in the designs; each keeps its
-// name for screen readers. Home, Search and Profile stay put; the center button shows which
-// side you are on, Posts (♥) or Products ($), and opens a menu to switch sides or reach the
-// Vault and Settings, turning into ⊖ while it's open. Home is the side's main screen: the
-// photo feed for Posts, the products page (page 24) for Products. The right-hand button follows
-// the side: Chat for Posts, Cart for Products.
+// The bottom navigation, as agreed with the client (October 2026): five icons, nothing that
+// opens above them. Home, Search and Profile keep their places; the center icon is the way to
+// the other section (a heart on Products, to Posts; a dollar sign on Posts, back to Products),
+// and the right-hand icon follows the section (Cart on Products, Chat on Posts). Home goes to
+// the current section's homepage: the products page, or for Posts the current event's
+// Overview (`postsHome`). Search searches the current section. Icons only, as in the designs,
+// each named for screen readers.
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-import {
-  House, Search, Heart, CircleDollarSign, User, MessageSquareMore, ShoppingCart, Lock, Settings, Minus, DollarSign,
-} from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { House, Search, Heart, DollarSign, User, MessageSquareMore, ShoppingCart } from "lucide-react";
+import { SECTION_COOKIE, sectionOf, type Section } from "@/lib/sections";
 
-const POSTS_PATHS = ["/posts", "/events", "/chat"];
-// The scoreboard is the Products side in the designs (page 11), though it sits under the event.
-const PRODUCTS_PATHS = [/^\/events\/[^/]+\/details/];
 const HIDDEN_ON = ["/signin", "/signup", "/reset-password"];
 
-// The center icons are drawn in a circle, as in the designs: a filled heart, a dollar sign, a minus.
+// The center icons are drawn in a circle, as in the designs.
 function Circled({ children }: { children: React.ReactNode }) {
   return <span className="flex size-8 items-center justify-center rounded-full border-2 border-current">{children}</span>;
 }
 
-export function BottomNav() {
+export function BottomNav({ lastSection, postsHome }: { lastSection: Section; postsHome: string }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const searchIn = useSearchParams().get("in");
+  const here = sectionOf(pathname, searchIn);
+  // The section of the last page that had one, for the pages shared by both: kept here while
+  // the visitor moves around, and in a cookie for the next full page load.
+  const [remembered, setRemembered] = useState<Section>(lastSection);
+  if (here && here !== remembered) setRemembered(here);
+  useEffect(() => {
+    if (here) document.cookie = `${SECTION_COOKIE}=${here}; path=/; max-age=31536000; samesite=lax`;
+  }, [here]);
+
   // /events itself is the full-screen card process; the event's own pages keep the nav.
   if (pathname === "/events" || HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
-  const posts = POSTS_PATHS.some((p) => pathname.startsWith(p)) && !PRODUCTS_PATHS.some((r) => r.test(pathname));
-  const dark = /^\/(posts|events\/[^/]+\/photos)\/?$/.test(pathname);
-  const center = open ? <Minus className="size-4" strokeWidth={3} />
-    : posts ? <Heart className="size-4 fill-current" strokeWidth={0} /> : <DollarSign className="size-4" strokeWidth={2.5} />;
+  const posts = (here ?? remembered) === "posts";
+  const dark = /^\/events\/[^/]+\/photos\/?$/.test(pathname);
+  const home = posts ? postsHome : "/";
 
-  const item = (href: string, label: string, Icon: typeof House, active = pathname === href) => (
+  const item = (href: string, label: string, Icon: typeof House, active: boolean) => (
     <Link href={href} aria-label={label} aria-current={active ? "page" : undefined} title={label}
-      onClick={() => setOpen(false)}
       className={`flex flex-1 items-center justify-center py-4 ${active ? "" : "opacity-75"}`}>
       <Icon className="size-7" strokeWidth={active ? 2 : 1.5} />
     </Link>
@@ -44,35 +48,20 @@ export function BottomNav() {
 
   return (
     <nav aria-label="Main" className={`fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)] ${dark ? "bg-black/80 text-white backdrop-blur" : "border-t border-line bg-paper text-ink"}`}>
-      {open && (
-        <div className="absolute inset-x-0 bottom-full mx-auto flex max-w-md justify-around border-t border-line bg-paper px-2 py-3 text-ink shadow-lg md:max-w-2xl">
-          {[
-            ["/vault", "Vault", Lock],
-            ["/posts", "Posts", Heart],
-            ["/", "Products", CircleDollarSign],
-            ["/settings", "Settings", Settings],
-          ].map(([href, label, Icon]) => {
-            const I = Icon as typeof House;
-            return (
-              <Link key={label as string} href={href as string} onClick={() => setOpen(false)}
-                className="flex w-20 flex-col items-center gap-1 rounded-lg py-2 text-xs uppercase tracking-wide hover:bg-fog">
-                <I className="size-6" strokeWidth={1.5} />
-                {label as string}
-              </Link>
-            );
-          })}
-        </div>
-      )}
       <div className="mx-auto flex max-w-md items-stretch md:max-w-2xl">
-        {item(posts ? "/posts" : "/", "Home", House)}
-        {item("/search", "Search", Search)}
-        <button type="button" aria-label={open ? "Close menu" : posts ? "Posts menu" : "Products menu"} aria-expanded={open}
-          title={posts ? "Posts" : "Products"} onClick={() => setOpen((o) => !o)}
-          className="flex flex-1 items-center justify-center py-4">
-          <Circled>{center}</Circled>
-        </button>
-        {item("/profile", "Profile", User)}
-        {posts ? item("/chat", "Chat", MessageSquareMore) : item("/cart", "Cart", ShoppingCart)}
+        {item(home, "Home", House, pathname === home)}
+        {item(posts ? "/search?in=posts" : "/search", "Search", Search, pathname === "/search")}
+        {posts ? (
+          <Link href="/" aria-label="Go to Products" title="Products" className="flex flex-1 items-center justify-center py-4">
+            <Circled><DollarSign className="size-4" strokeWidth={2.5} /></Circled>
+          </Link>
+        ) : (
+          <Link href={postsHome} aria-label="Go to Posts" title="Posts" className="flex flex-1 items-center justify-center py-4">
+            <Circled><Heart className="size-4 fill-current" strokeWidth={0} /></Circled>
+          </Link>
+        )}
+        {item("/profile", "Profile", User, pathname.startsWith("/profile") || pathname === "/settings")}
+        {posts ? item("/chat", "Chat", MessageSquareMore, pathname === "/chat") : item("/cart", "Cart", ShoppingCart, pathname === "/cart")}
       </div>
     </nav>
   );

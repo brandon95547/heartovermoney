@@ -42,12 +42,14 @@ function Countdown({ deadline, onExpire }: { deadline: number; onExpire: () => v
   return <span className="font-mono text-5xl font-bold tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</span>;
 }
 
-export function CardProcess({ event, options, tagline: savedTagline, shipAddress, vipMember }: {
+export function CardProcess({ event, options, tagline: savedTagline, shipAddress, vipMember, forChat = false }: {
   event: { id: string; slug: string; title: string; place: string; when: string };
   options: CardDesign[];
   tagline: string;
   shipAddress: string;
   vipMember: boolean;
+  // Sent here by the Chat icon: say why registering comes first.
+  forChat?: boolean;
 }) {
   const [favorite, setFavorite] = useState<CardDesign | null>(null);
   const [jokerChoice, setJokerChoice] = useState<JokerChoice | null>(null);
@@ -96,6 +98,7 @@ export function CardProcess({ event, options, tagline: savedTagline, shipAddress
       <input type="hidden" name="favorite" value={favorite ?? ""} />
       <input type="hidden" name="tagline" value={tagline} />
       <input type="hidden" name="fulfillment" value={ship ? "ship" : "pickup"} />
+      {forChat && <p className="text-center text-sm font-semibold">Register for the event with your collector card to open the Connections Messenger.</p>}
 
       <div className="flex flex-1 flex-col justify-center gap-8">
         {step === "favorite" && (
@@ -205,7 +208,9 @@ function Done({ design, jokerChoice, ship, slug, code, qr, event, vipMember }: N
           <p className="text-xs text-muted">Show this at the door. It&apos;s also in My Cards.</p>
         </div>
       )}
+      {/* Registration leads to the Connections Messenger (development overview page 2). */}
       <div className="flex w-full flex-col gap-3">
+        <Link href="/chat" className={buttonClass("outline", "border-white bg-white text-ink hover:bg-white/90")}>Open the Connections Messenger</Link>
         <Link href={`/events/${slug}`} className={buttonClass("outline", "border-white text-white hover:bg-white/10")}>See the event</Link>
         <Link href="/profile/cards" className="text-sm font-semibold underline">My cards</Link>
       </div>

@@ -42,9 +42,11 @@ function EmailField({ defaultValue }: { defaultValue?: string }) {
   );
 }
 
-// Shown when the link on a card (heartovermoney.com/events) sent the visitor here.
+// Shown when the link on a card (heartovermoney.com/events) or the Chat icon sent the visitor here.
 function ForTheEvent({ next }: { next: string }) {
-  return next === "/events" ? <p className="text-center text-sm">Sign in or create an account to get your card for the next event.</p> : null;
+  if (next.startsWith("/events")) return <p className="text-center text-sm">Sign in or create an account to get your card for the next event.</p>;
+  if (next === "/chat") return <p className="text-center text-sm">Sign in or create an account to join the Connections Messenger.</p>;
+  return null;
 }
 
 export function SignInForm() {

@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Food + drink" };
 export default function MenuPage(props: PageProps<"/events/[slug]/menu">) {
   return (
     <main>
-      <Suspense fallback={<><PageHeader title="Food + Drink" back="/posts" /><Skeleton className="m-5 h-96" /></>}>
+      <Suspense fallback={<><PageHeader title="Food + Drink" /><Skeleton className="m-5 h-96" /></>}>
         <Menu params={props.params} />
       </Suspense>
     </main>

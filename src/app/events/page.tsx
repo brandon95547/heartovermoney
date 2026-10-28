@@ -13,16 +13,17 @@ import { CardProcess } from "./card-process";
 
 export const metadata: Metadata = { title: "The next event" };
 
-export default function NextEventPage() {
+export default function NextEventPage(props: PageProps<"/events">) {
   return (
     <main className="chevrons fixed inset-0 z-50 mx-auto flex max-w-md flex-col text-white md:max-w-2xl">
       <div className="flex justify-end p-4"><Link href="/" className="text-sm">Skip</Link></div>
-      <Suspense fallback={<div className="flex-1" />}><Registration /></Suspense>
+      <Suspense fallback={<div className="flex-1" />}><Registration searchParams={props.searchParams} /></Suspense>
     </main>
   );
 }
 
-async function Registration() {
+// `?for=chat`: sent from the Chat icon, which opens once the guest is registered.
+async function Registration({ searchParams }: { searchParams: PageProps<"/events">["searchParams"] }) {
   const event = await getNextEvent();
   if (!event) {
     return (
@@ -33,12 +34,13 @@ async function Registration() {
       </div>
     );
   }
-  const user = await requireUser("/events");
-  if (await getRegistration(event.id, user.id)) redirect(`/events/${event.slug}`);
+  const forChat = (await searchParams).for === "chat";
+  const user = await requireUser(forChat ? "/chat" : "/events");
+  if (await getRegistration(event.id, user.id)) redirect(forChat ? "/chat" : `/events/${event.slug}`);
   const options = await listCardOptions(event.id);
   return (
     <CardProcess
       event={{ id: event.id, slug: event.slug, title: event.title, place: `${event.cityName}, ${event.cityState}`, when: eventDate(event.startsAt) }}
-      options={options.map((o) => o.design)} tagline={user.tagline ?? ""} shipAddress={user.shipAddress ?? ""} vipMember={user.isVip} />
+      options={options.map((o) => o.design)} tagline={user.tagline ?? ""} shipAddress={user.shipAddress ?? ""} vipMember={user.isVip} forChat={forChat} />
   );
 }

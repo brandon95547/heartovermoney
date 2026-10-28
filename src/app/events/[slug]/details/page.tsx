@@ -16,7 +16,7 @@ import { EventHeading } from "../event-heading";
 export default function EventDetailsPage(props: PageProps<"/events/[slug]/details">) {
   return (
     <main>
-      <Suspense fallback={<><PageHeader title="Details" back="/posts" /><Skeleton className="m-5 h-96" /></>}>
+      <Suspense fallback={<><PageHeader title="Details" /><Skeleton className="m-5 h-96" /></>}>
         <Details params={props.params} />
       </Suspense>
     </main>
@@ -37,7 +37,9 @@ async function Details({ params }: { params: PageProps<"/events/[slug]/details">
     getUser(),
   ]);
   const costShare = score.net > 0 ? (event.costCents / score.revenue) * 100 : 100;
-  const showName = (username: string, role: string, tier: string | null) => (!isVipMember(role, tier) || viewer?.isVip ? `@${username}` : mask());
+  // Hidden from everyone if the buyer chose so in Settings; a VIP's name only to other VIPs.
+  const showName = (username: string, role: string, tier: string | null, shown: boolean) =>
+    shown && (!isVipMember(role, tier) || viewer?.isVip) ? `@${username}` : mask();
 
   return (
     <>
@@ -96,7 +98,7 @@ async function Details({ params }: { params: PageProps<"/events/[slug]/details">
                       <Link href={sale.artSlug ? `/art/${sale.artSlug}` : `/auctions/${sale.lotId}`} className="block text-[10px] text-muted underline-offset-2 hover:underline">{sale.label}</Link>
                     )}
                   </td>
-                  <td className="py-1.5">{showName(sale.buyer, sale.buyerRole, sale.buyerTier)}</td>
+                  <td className="py-1.5">{showName(sale.buyer, sale.buyerRole, sale.buyerTier, sale.buyerShown)}</td>
                   <td className="py-1.5 text-right">{money(sale.unitPriceCents * sale.quantity)}</td>
                 </tr>
               ))}

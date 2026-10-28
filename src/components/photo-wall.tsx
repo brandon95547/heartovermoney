@@ -1,30 +1,28 @@
-// The photo wall (screen design pages 6–9): one photo per screen, swiped vertically, with
-// likes and thumbs-downs, sharing and downloading, the poster's caption and the event's hashtags. Refreshes on its own
-// so new photos appear during an event. The Posts feed shows every event's photos, each
-// linking to its event; an event's own wall shows only that event's. Admins can remove one.
+// An event's photo wall (screen design pages 6–9): the photos posted to the event, one per
+// screen, swiped vertically, with the poster's hashtags across the top, likes and thumbs-downs,
+// sharing and downloading, and the caption. Refreshes on its own so new photos appear during the
+// event. Admins can remove one.
 import Link from "next/link";
-import { Camera, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Camera, ChevronLeft, Download } from "lucide-react";
 import { ArtImage } from "@/components/art-image";
 import { AutoRefresh, DownvoteButton, LikeButton, RemovePhotoButton, ShareButton } from "@/components/event-client";
 import { Logo } from "@/components/logo";
+import { eventHashtag } from "@/lib/hashtags";
 import type { listPhotos } from "@/lib/queries";
 
 type Photo = Awaited<ReturnType<typeof listPhotos>>[number];
 
-export function PhotoWall({ photos, viewer, back, menu, postHref, showEvent = false }: {
+export function PhotoWall({ photos, viewer, back, postHref }: {
   photos: Photo[];
   viewer: { id: string; isAdmin: boolean } | null;
-  back?: { href: string; label: string };
-  // In place of the back link: the Posts feed puts ☰ there.
-  menu?: React.ReactNode;
+  back: { href: string; label: string };
   postHref?: string;
-  showEvent?: boolean;
 }) {
   return (
     <>
       <AutoRefresh seconds={8} />
       <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4">
-        {back ? <Link href={back.href} aria-label={back.label} className="rounded-full bg-black/40 p-2"><ChevronLeft className="size-5" /></Link> : menu ?? <span />}
+        <Link href={back.href} aria-label={back.label} className="rounded-full bg-black/40 p-2"><ChevronLeft className="size-5" /></Link>
         {postHref && <Link href={postHref} className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-ink"><Camera className="size-4" /> Post a photo</Link>}
       </div>
       <div className="snap-wall h-full overflow-y-auto pb-16">
@@ -34,7 +32,7 @@ export function PhotoWall({ photos, viewer, back, menu, postHref, showEvent = fa
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
             <div className="absolute left-4 right-4 top-16 flex items-center gap-3">
               <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/70 bg-black"><Logo size={26} reversed /></span>
-              <p className="text-lg leading-tight">#heartovermoney #art #{p.cityName.toLowerCase()}{p.eventStartsAt.getFullYear()}</p>
+              <p className="text-lg leading-tight">{[...new Set([...p.hashtags, eventHashtag(p.cityName, p.eventStartsAt)])].map((h) => `#${h}`).join(" ")}</p>
             </div>
             <div className="absolute left-4 top-36 flex flex-col items-center gap-6">
               <LikeButton photoId={p.id} slug={p.eventSlug} liked={p.liked} count={p.likes} />
@@ -47,11 +45,6 @@ export function PhotoWall({ photos, viewer, back, menu, postHref, showEvent = fa
             <div className="absolute inset-x-0 bottom-20 px-5">
               <p className="text-lg font-bold">@{p.username}</p>
               {p.caption && <p className="text-lg leading-snug">{p.caption}</p>}
-              {showEvent && (
-                <Link href={`/events/${p.eventSlug}`} className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
-                  {p.eventTitle} · {p.cityName} <ChevronRight className="size-3.5" />
-                </Link>
-              )}
             </div>
           </section>
         ))}

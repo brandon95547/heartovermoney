@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Settings } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { Logo } from "@/components/logo";
 import { PageHeader, SectionLabel, Skeleton, buttonClass } from "@/components/ui";
@@ -15,7 +15,12 @@ export const metadata: Metadata = { title: "Profile" };
 export default function ProfilePage(props: PageProps<"/profile">) {
   return (
     <main>
-      <PageHeader title="Profile" />
+      {/* Settings live inside Profile, behind the gear (the client's navigation, October 2026). */}
+      <PageHeader title="Profile" right={
+        <Link href="/settings" aria-label="Settings" title="Settings" className="flex size-10 items-center justify-center rounded-full hover:bg-fog">
+          <Settings className="size-5" strokeWidth={1.5} />
+        </Link>
+      } />
       <Suspense fallback={<Skeleton className="m-5 h-80" />}><Profile searchParams={props.searchParams} /></Suspense>
     </main>
   );
@@ -61,7 +66,6 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["
         {link("/profile/cards", "My cards", "Collector cards")}
         {link("/membership", "Membership", tier ? tier.name : "Join")}
         {link("/events", "The next event")}
-        {link("/settings", "Settings")}
         {user.role === "admin" && link("/admin", "Admin panel", "Staff")}
         {user.role === "admin" && link("/admin/check-in", "Door check-in", "Staff")}
       </nav>

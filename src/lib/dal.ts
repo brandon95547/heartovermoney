@@ -20,6 +20,8 @@ export type CurrentUser = {
   isVip: boolean;
   shipAddress: string | null;
   emailUpdates: boolean;
+  listedAsAttendee: boolean;
+  showOnScoreboard: boolean;
 };
 
 export const getUser = cache(async (): Promise<CurrentUser | null> => {
@@ -31,6 +33,7 @@ export const getUser = cache(async (): Promise<CurrentUser | null> => {
     id: u.id, username: u.username, displayName: u.displayName, email: u.email, tagline: u.tagline,
     role: u.role, membershipTier: u.membershipTier, isVip: isVipMember(u.role, u.membershipTier),
     shipAddress: u.shipAddress, emailUpdates: u.emailUpdates,
+    listedAsAttendee: u.listedAsAttendee, showOnScoreboard: u.showOnScoreboard,
   };
 });
 

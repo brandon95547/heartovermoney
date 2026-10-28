@@ -11,13 +11,14 @@ import { Logo } from "@/components/logo";
 
 export type MenuPerson = { displayName: string; tagline: string | null; isVip: boolean } | null;
 
-const SECTIONS = [
+// Posts is the current event's Overview (its photos are the posts); `postsHref` is its address.
+const sections = (postsHref: string) => [
   { title: "Shop", links: [["/", "Home"], ["/cities", "Collections"], ["/auctions", "Auctions"], ["/membership", "Membership"]] },
-  { title: "Events & stories", links: [["/events", "The next event"], ["/posts", "Posts"], ["/films", "Films"], ["/mission", "The mission"]] },
+  { title: "Events & stories", links: [[postsHref, "Posts"], ["/events", "Get your card"], ["/films", "Films"], ["/mission", "The mission"]] },
   { title: "More", links: [["/about", "About"], ["/contact", "Contact"]] },
 ] as const;
 
-export function MenuDrawer({ person, tone = "light" }: { person: MenuPerson; tone?: "light" | "dark" }) {
+export function MenuDrawer({ person, postsHref, tone = "light" }: { person: MenuPerson; postsHref: string; tone?: "light" | "dark" }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const pathname = usePathname();
   const close = () => dialog.current?.close();
@@ -43,12 +44,12 @@ export function MenuDrawer({ person, tone = "light" }: { person: MenuPerson; ton
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-2">
-          {SECTIONS.map((section) => (
+          {sections(postsHref).map((section) => (
             <div key={section.title} className="px-4 py-3">
               <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{section.title}</p>
               <ul>
                 {section.links.map(([href, label]) => {
-                  const current = href === "/" ? pathname === "/" : pathname.startsWith(href);
+                  const current = href === "/" ? pathname === "/" : href === "/events" ? pathname === "/events" : pathname.startsWith(href);
                   return (
                     <li key={href}>
                       <Link href={href} onClick={close} aria-current={current ? "page" : undefined}

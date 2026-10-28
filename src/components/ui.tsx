@@ -14,15 +14,16 @@ export function buttonClass(variant: keyof typeof BUTTON = "primary", extra = ""
   return `inline-flex h-12 items-center justify-center gap-2 rounded-full px-6 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:bg-mist disabled:text-white ${BUTTON[variant]} ${extra}`;
 }
 
-// "‹  BUY NOW": back link on the left, the screen's name centered in capitals.
-export function PageHeader({ title, back, right }: { title: string; back?: string; right?: React.ReactNode }) {
+// "‹  BUY NOW": back link on the left (or `left`, e.g. ☰ on a section's homepage), the
+// screen's name centered in capitals.
+export function PageHeader({ title, back, left, right }: { title: string; back?: string; left?: React.ReactNode; right?: React.ReactNode }) {
   return (
     <header className="sticky top-0 z-30 grid h-14 grid-cols-[3rem_1fr_3rem] items-center border-b border-line bg-paper/95 backdrop-blur">
       {back ? (
         <Link href={back} aria-label="Back" className="flex h-full items-center justify-center">
           <ChevronLeft className="size-6" strokeWidth={1.5} />
         </Link>
-      ) : <span />}
+      ) : <div className="flex justify-center">{left}</div>}
       <h1 className="truncate text-center text-sm font-medium uppercase tracking-[0.12em]">{title}</h1>
       <div className="flex justify-center">{right}</div>
     </header>

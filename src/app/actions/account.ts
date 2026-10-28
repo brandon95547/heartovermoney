@@ -25,17 +25,29 @@ const Profile = z.object({
   shipAddress: z.string().trim().max(300),
 });
 
-// Settings: name, the line about you, the default shipping address and email updates.
+// Settings: name, the line about you and the default shipping address.
 export async function updateProfile(_: AccountState, form: FormData): Promise<AccountState> {
   const user = await signedIn("/settings");
   const parsed = Profile.safeParse({ displayName: form.get("displayName"), tagline: form.get("tagline") ?? "", shipAddress: form.get("shipAddress") ?? "" });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { displayName, tagline, shipAddress } = parsed.data;
   if (shipAddress && shipAddress.length < 10) return { error: "Enter the full shipping address, or leave it empty." };
+  await db.update(s.users).set({ displayName, tagline: tagline || null, shipAddress: shipAddress || null }).where(eq(s.users.id, user.id));
+  revalidatePath("/settings");
+  return { ok: "Saved." };
+}
+
+// Settings: notifications (news of drops and events by email) and privacy (the attendee list,
+// the scoreboard).
+export async function updatePreferences(_: AccountState, form: FormData): Promise<AccountState> {
+  const user = await signedIn("/settings");
   await db.update(s.users).set({
-    displayName, tagline: tagline || null, shipAddress: shipAddress || null, emailUpdates: form.get("emailUpdates") === "on",
+    emailUpdates: form.get("emailUpdates") === "on",
+    listedAsAttendee: form.get("listedAsAttendee") === "on",
+    showOnScoreboard: form.get("showOnScoreboard") === "on",
   }).where(eq(s.users.id, user.id));
   revalidatePath("/settings");
+  revalidatePath("/", "layout");
   return { ok: "Saved." };
 }
 

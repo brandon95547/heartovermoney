@@ -137,6 +137,12 @@ export function PhotoForm({ slug }: { slug: string }) {
       </label>
       <input name="caption" maxLength={200} placeholder="Say something about it"
         className="h-12 w-full rounded-md bg-fog px-4 text-sm outline-none focus:ring-2 focus:ring-ink/20" />
+      <label className="block">
+        <span className="sr-only">Hashtags</span>
+        <input name="hashtags" maxLength={200} placeholder="#hashtags, e.g. #healing #love" autoCapitalize="none"
+          className="h-12 w-full rounded-md bg-fog px-4 text-sm outline-none focus:ring-2 focus:ring-ink/20" />
+        <span className="mt-1 block text-xs text-muted">Up to eight. The event&apos;s own tag is added for you.</span>
+      </label>
       <Message state={state} />
       <button disabled={pending} className={buttonClass("black", "w-full")}>{pending ? "Posting…" : "Post to the photo wall"}</button>
     </form>

@@ -36,6 +36,10 @@ export const users = pgTable("users", {
   // whether to get news of drops and events by email.
   shipAddress: text("ship_address"),
   emailUpdates: boolean("email_updates").notNull().default(true),
+  // Privacy (Settings): whether other guests see this person in an event's attendee list (the
+  // Connections Messenger), and whether their name shows on Tonight's Scoreboard.
+  listedAsAttendee: boolean("listed_as_attendee").notNull().default(true),
+  showOnScoreboard: boolean("show_on_scoreboard").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -218,7 +222,8 @@ export const orderItems = pgTable("order_items", {
   unitPriceCents: integer("unit_price_cents").notNull(),
 });
 
-// A photo posted to an event's photo wall. A removed photo (by an admin, or by enough of the
+// A photo posted to an event: a "post" (the client's word), shown as a thumbnail on the event's
+// Overview and full screen on its photo wall. A removed photo (by an admin, or by enough of the
 // community's thumbs-downs) leaves the wall but is kept, so an admin can restore it.
 export const photos = pgTable("photos", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -226,6 +231,8 @@ export const photos = pgTable("photos", {
   userId: uuid("user_id").notNull().references(() => users.id),
   image: text("image").notNull(),
   caption: text("caption").notNull().default(""),
+  // The poster's hashtags, without the #, shown across the top of the photo (design page 9).
+  hashtags: jsonb("hashtags").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   removedAt: timestamp("removed_at", { withTimezone: true }),
   removedBy: photoRemovalEnum("removed_by"),

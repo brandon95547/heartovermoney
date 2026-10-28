@@ -19,7 +19,7 @@ async function NewPhoto({ params }: { params: PageProps<"/events/[slug]/photos/n
   await requireUser(`/events/${slug}/photos/new`);
   return (
     <>
-      <PageHeader title="Post a photo" back={`/events/${slug}/photos`} />
+      <PageHeader title="Post a photo" back={`/events/${slug}`} />
       <div className="p-5"><PhotoForm slug={slug} /></div>
     </>
   );
