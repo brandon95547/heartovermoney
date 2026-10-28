@@ -58,7 +58,7 @@ async function Overview({ params }: { params: PageProps<"/events/[slug]">["param
           {photos.slice(0, 6).map((p) => (
             <li key={p.id}>
               <Link href={`/events/${slug}/photos#${p.id}`} className="relative block aspect-square overflow-hidden rounded-sm bg-mist">
-                <ArtImage src={p.image} alt={p.caption || `Photo by @${p.username}`} sizes="104px" />
+                <ArtImage src={p.image} alt={p.caption || `Photo by @${p.username}`} sizes="104px" className="object-[50%_30%]" />
               </Link>
             </li>
           ))}

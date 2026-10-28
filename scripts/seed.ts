@@ -202,18 +202,18 @@ async function main() {
     ]);
   }
 
-  // Example photos from Unsplash (public/examples/posts, credited in its CREDITS.md).
+  // Example photos (public/examples/posts, sources in its CREDITS.md), oldest first.
   const captions = [
-    ["sarah_parish", "Worship on the steps before the doors opened", "worship-steps", ["worship", "healing", "love"]],
-    ["FredMack", "The founders canvas, half finished", "founders-canvas", ["art", "happenings"]],
-    ["DizzyDolly", "First look at the Charlotte collection", "first-look", ["art", "exhibitjoy"]],
-    ["JasonMackMiller", "Choir from the church on Tryon Street", "church-choir", ["worship", "choir"]],
-    ["MonicaBarkley", "Barbecue line, as long as the art line", "barbecue-line", ["happenings"]],
-    ["BryanCho", "Edition 1 of the collector print", "collector-print", ["art", "collector"]],
+    ["FredMack", "Lost in the founders canvas", "founders-canvas", ["art", "exhibitjoy"]],
+    ["BryanCho", "Even the dog came for the barbecue", "barbecue-dog", ["happenings"]],
+    ["MonicaBarkley", "Coffee by the water before the doors opened", "coffee-by-the-water", ["happenings"]],
+    ["DizzyDolly", "Fifty-one years married and still laughing", "laughing-couple", ["love", "joy"]],
+    ["JasonMackMiller", "Nobody stopped smiling after the choir's last song", "choir-smile", ["worship", "choir", "joy"]],
+    ["sarah_parish", "Dancing on the lawn while the band warmed up", "lawn-dance", ["worship", "healing", "love"]],
   ] as const;
   const photos = await db.insert(s.photos).values(captions.map(([username, caption, file, hashtags], i) => ({
     eventId: event.id, userId: u[username].id, caption, hashtags: [...hashtags],
-    image: `/examples/posts/${file}.jpg`,
+    image: `/examples/posts/${file}.webp`,
     createdAt: new Date(Date.now() - (captions.length - i) * 7 * 60_000),
   }))).returning();
   await db.insert(s.photoLikes).values(photos.flatMap((p, i) => users.slice(0, 3 + (i % 5)).map((x) => ({ photoId: p.id, userId: x.id }))));
