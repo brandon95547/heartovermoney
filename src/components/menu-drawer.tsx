@@ -22,14 +22,17 @@ export function MenuDrawer({ person, postsHref, tone = "light" }: { person: Menu
   const dialog = useRef<HTMLDialogElement>(null);
   const pathname = usePathname();
   const close = () => dialog.current?.close();
+  // Opening a dialog focuses its first link, the logo, which some browsers then outline; the
+  // panel takes the focus instead (Tab still reaches the logo first).
+  const open = () => { dialog.current?.showModal(); dialog.current?.focus(); };
   return (
     <>
-      <button type="button" onClick={() => dialog.current?.showModal()} aria-label="Menu" aria-haspopup="dialog"
+      <button type="button" onClick={open} aria-label="Menu" aria-haspopup="dialog"
         className={`flex size-10 items-center justify-center rounded-full ${tone === "dark" ? "bg-black/40 text-white" : "text-ink hover:bg-fog"}`}>
         <Menu className="size-6" strokeWidth={1.5} />
       </button>
-      <dialog ref={dialog} aria-label="Menu" onClick={(e) => { if (e.target === dialog.current) close(); }}
-        className="my-0 mr-0 ml-[max(0px,calc((100vw-28rem)/2))] h-dvh max-h-none w-[85%] max-w-sm bg-paper md:ml-[calc((100vw-42rem)/2)] p-0 text-ink backdrop:bg-black/50 open:flex open:flex-col">
+      <dialog ref={dialog} aria-label="Menu" tabIndex={-1} onClick={(e) => { if (e.target === dialog.current) close(); }}
+        className="my-0 mr-0 ml-[max(0px,calc((100vw-28rem)/2))] h-dvh max-h-none w-[85%] max-w-sm bg-paper outline-none md:ml-[calc((100vw-42rem)/2)] p-0 text-ink backdrop:bg-black/50 open:flex open:flex-col">
         <div className="flex items-center justify-between border-b border-line p-4">
           <Link href="/" onClick={close} aria-label="Heart Over Money home" className="flex h-11 shrink-0 items-center">
             <Logo size={40} />
