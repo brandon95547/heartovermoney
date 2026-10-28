@@ -6,14 +6,12 @@
 // and the right-hand icon follows the section (Cart on Products, Chat on Posts). Home goes to
 // the current section's homepage: the products page, or for Posts the current event's
 // Overview (`postsHome`). Search searches the current section. Icons only, as in the designs,
-// each named for screen readers.
+// each named for screen readers, and on every page, fixed to the bottom of the screen.
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { House, Search, Heart, DollarSign, User, MessageSquareMore, ShoppingCart } from "lucide-react";
 import { SECTION_COOKIE, sectionOf, type Section } from "@/lib/sections";
-
-const HIDDEN_ON = ["/signin", "/signup", "/reset-password"];
 
 // The center icons are drawn in a circle, as in the designs.
 function Circled({ children }: { children: React.ReactNode }) {
@@ -31,9 +29,6 @@ export function BottomNav({ lastSection, postsHome }: { lastSection: Section; po
   useEffect(() => {
     if (here) document.cookie = `${SECTION_COOKIE}=${here}; path=/; max-age=31536000; samesite=lax`;
   }, [here]);
-
-  // /events itself is the full-screen card process; the event's own pages keep the nav.
-  if (pathname === "/events" || HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
   const posts = (here ?? remembered) === "posts";
   const dark = /^\/events\/[^/]+\/photos\/?$/.test(pathname);

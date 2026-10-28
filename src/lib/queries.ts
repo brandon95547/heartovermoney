@@ -96,7 +96,7 @@ export async function getNextEvent() {
   await connection();
   const since = new Date(new Date().getTime() - 86_400_000);
   const [ev] = await db.select({
-    id: s.events.id, slug: s.events.slug, title: s.events.title, startsAt: s.events.startsAt,
+    id: s.events.id, slug: s.events.slug, title: s.events.title, startsAt: s.events.startsAt, terms: s.events.terms,
     cityName: s.cities.name, cityState: s.cities.state,
   }).from(s.events).innerJoin(s.cities, eq(s.cities.id, s.events.cityId))
     .where(gt(s.events.startsAt, since)).orderBy(asc(s.events.startsAt)).limit(1);

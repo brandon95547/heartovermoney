@@ -5,18 +5,21 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import { signIn, signUp, type AuthState } from "@/app/actions/auth";
 import { Field, buttonClass } from "@/components/ui";
 
+// The password field, with an eye that shows or hides what was typed.
 function PasswordField({ autoComplete }: { autoComplete: string }) {
   const [shown, setShown] = useState(false);
+  const Icon = shown ? EyeOff : Eye;
   return (
     <div className="relative">
-      <Field label="Your password" name="password" type={shown ? "text" : "password"} autoComplete={autoComplete} required minLength={8} />
-      <button type="button" onClick={() => setShown((s) => !s)}
-        className="absolute inset-y-0 right-4 my-auto h-7 rounded bg-paper px-2 text-[10px] font-bold uppercase">
-        {shown ? "Hide" : "Show"}
+      <Field label="Your password" name="password" type={shown ? "text" : "password"} autoComplete={autoComplete} required minLength={8}
+        style={{ paddingRight: "3.5rem" }} />
+      <button type="button" onClick={() => setShown((s) => !s)} aria-label={shown ? "Hide password" : "Show password"} title={shown ? "Hide password" : "Show password"}
+        className="absolute inset-y-0 right-3 my-auto flex size-10 items-center justify-center rounded-full text-muted hover:text-ink">
+        <Icon className="size-5" strokeWidth={1.75} />
       </button>
     </div>
   );
@@ -42,20 +45,12 @@ function EmailField({ defaultValue }: { defaultValue?: string }) {
   );
 }
 
-// Shown when the link on a card (heartovermoney.com/events) or the Chat icon sent the visitor here.
-function ForTheEvent({ next }: { next: string }) {
-  if (next.startsWith("/events")) return <p className="text-center text-sm">Sign in or create an account to get your card for the next event.</p>;
-  if (next === "/chat") return <p className="text-center text-sm">Sign in or create an account to join the Connections Messenger.</p>;
-  return null;
-}
-
 export function SignInForm() {
   const next = useSearchParams().get("next") ?? "/";
   const [state, action, pending] = useActionState(signIn, undefined);
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
-      <ForTheEvent next={next} />
       <EmailField key={state?.fields?.email} defaultValue={state?.fields?.email} />
       <PasswordField autoComplete="current-password" />
       <FormError state={state} />
@@ -78,7 +73,6 @@ export function SignUpForm() {
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
-      <ForTheEvent next={next} />
       <Field label="Your name" name="displayName" autoComplete="name" required defaultValue={f.displayName} />
       <Field label="Username" name="username" autoComplete="username" required defaultValue={f.username} />
       <Field label="Email" name="email" type="email" autoComplete="email" required defaultValue={f.email} />

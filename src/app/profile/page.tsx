@@ -3,9 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ChevronRight, Settings } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
-import { Logo } from "@/components/logo";
 import { PageHeader, SectionLabel, Skeleton, buttonClass } from "@/components/ui";
-import { getUser } from "@/lib/dal";
+import { requireUser } from "@/lib/dal";
 import { money } from "@/lib/format";
 import { FINE_ART_KINDS, isSuperOptimistic, tierById } from "@/lib/membership";
 import { listOrders, listVault } from "@/lib/queries";
@@ -27,17 +26,7 @@ export default function ProfilePage(props: PageProps<"/profile">) {
 }
 
 async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["searchParams"] }) {
-  const [user, sp] = await Promise.all([getUser(), searchParams]);
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center gap-6 px-8 py-16 text-center">
-        <Logo size={76} />
-        <p className="text-sm text-muted">Sign in to see your collection, orders and membership.</p>
-        <Link href="/signin?next=/profile" className={buttonClass("black", "w-full")}>Sign in</Link>
-        <Link href="/signup?next=/profile" className={buttonClass("outline", "w-full")}>Create account</Link>
-      </div>
-    );
-  }
+  const [user, sp] = await Promise.all([requireUser("/profile"), searchParams]);
   const tier = tierById(user.membershipTier);
   const [orders, vault] = await Promise.all([listOrders(user.id), listVault(user.id)]);
   const superOptimistic = isSuperOptimistic(user.membershipTier, vault.filter((p) => p.status === "active" && FINE_ART_KINDS.includes(p.kind)).length);

@@ -43,7 +43,7 @@ function Countdown({ deadline, onExpire }: { deadline: number; onExpire: () => v
 }
 
 export function CardProcess({ event, options, tagline: savedTagline, shipAddress, vipMember, forChat = false }: {
-  event: { id: string; slug: string; title: string; place: string; when: string };
+  event: { id: string; slug: string; title: string; place: string; when: string; terms: string };
   options: CardDesign[];
   tagline: string;
   shipAddress: string;
@@ -165,9 +165,12 @@ export function CardProcess({ event, options, tagline: savedTagline, shipAddress
               ))}
             </div>
             {ship && <textarea name="address" rows={3} defaultValue={shipAddress} placeholder="Shipping address" className="w-full rounded-md bg-white p-4 text-sm text-ink outline-none" />}
-            <p className="text-center text-xs text-white/70">
-              Registering means you agree to <a href={`/events/${event.slug}#terms`} target="_blank" rel="noopener" className="underline">the event&apos;s terms</a>.
-            </p>
+            {event.terms && (
+              <details className="text-xs text-white/70">
+                <summary className="cursor-pointer text-center">Registering means you agree to the event&apos;s <span className="underline">terms</span>.</summary>
+                <div className="mt-2 max-h-40 space-y-2 overflow-y-auto text-left leading-relaxed">{event.terms.split("\n").map((line) => <p key={line}>{line}</p>)}</div>
+              </details>
+            )}
             {state?.error && <p role="alert" className="text-center text-sm text-[#ff8a80]">{state.error}</p>}
             <button disabled={pending} className={buttonClass("outline", "border-white text-white hover:bg-white/10")}>
               {pending ? "Saving…" : "Finish"}

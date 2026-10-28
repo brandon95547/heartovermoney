@@ -10,7 +10,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Link2, MessageCircle } from "lucide-react";
 import { Empty, PageHeader, Skeleton, buttonClass } from "@/components/ui";
-import { getUser } from "@/lib/dal";
+import { requireUser } from "@/lib/dal";
 import { eventDate } from "@/lib/format";
 import { getNextEvent, getRegistration, listAttendees } from "@/lib/queries";
 
@@ -26,18 +26,7 @@ export default function ChatPage(props: PageProps<"/chat">) {
 }
 
 async function Messenger({ searchParams }: { searchParams: PageProps<"/chat">["searchParams"] }) {
-  const [user, event, sp] = await Promise.all([getUser(), getNextEvent(), searchParams]);
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center gap-5 px-8 py-14 text-center">
-        <MessageCircle className="size-12" strokeWidth={1.25} />
-        <h2 className="text-xl font-bold">The Connections Messenger</h2>
-        <p className="text-sm leading-relaxed text-muted">Meet the other guests at the event. Sign in, or create an account, and register for the event with your collector card to join.</p>
-        <Link href="/signin?next=/chat" className={buttonClass("black", "w-full")}>Sign in</Link>
-        <Link href="/signup?next=/chat" className={buttonClass("outline", "w-full")}>Create account</Link>
-      </div>
-    );
-  }
+  const [user, event, sp] = await Promise.all([requireUser("/chat"), getNextEvent(), searchParams]);
   if (!event) {
     return (
       <div className="space-y-4 p-5">

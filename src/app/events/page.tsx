@@ -15,7 +15,8 @@ export const metadata: Metadata = { title: "The next event" };
 
 export default function NextEventPage(props: PageProps<"/events">) {
   return (
-    <main className="chevrons fixed inset-0 z-50 mx-auto flex max-w-md flex-col text-white md:max-w-2xl">
+    // Full screen, with room at the bottom for the navigation, which stays in front.
+    <main className="chevrons fixed inset-0 z-30 mx-auto flex max-w-md flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] text-white md:max-w-2xl">
       <div className="flex justify-end p-4"><Link href="/" className="text-sm">Skip</Link></div>
       <Suspense fallback={<div className="flex-1" />}><Registration searchParams={props.searchParams} /></Suspense>
     </main>
@@ -40,7 +41,7 @@ async function Registration({ searchParams }: { searchParams: PageProps<"/events
   const options = await listCardOptions(event.id);
   return (
     <CardProcess
-      event={{ id: event.id, slug: event.slug, title: event.title, place: `${event.cityName}, ${event.cityState}`, when: eventDate(event.startsAt) }}
+      event={{ id: event.id, slug: event.slug, title: event.title, place: `${event.cityName}, ${event.cityState}`, when: eventDate(event.startsAt), terms: event.terms }}
       options={options.map((o) => o.design)} tagline={user.tagline ?? ""} shipAddress={user.shipAddress ?? ""} vipMember={user.isVip} forChat={forChat} />
   );
 }
