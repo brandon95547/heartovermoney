@@ -202,17 +202,18 @@ async function main() {
     ]);
   }
 
+  // Example photos from Unsplash (public/examples/posts, credited in its CREDITS.md).
   const captions = [
-    ["sarah_parish", "Worship on the steps before the doors opened", 330, ["worship", "healing", "love"]],
-    ["FredMack", "The founders canvas, half finished", 20, ["art", "happenings"]],
-    ["DizzyDolly", "First look at the Charlotte collection", 280, ["art", "exhibitjoy"]],
-    ["JasonMackMiller", "Choir from the church on Tryon Street", 200, ["worship", "choir"]],
-    ["MonicaBarkley", "Barbecue line, as long as the art line", 40, ["happenings"]],
-    ["BryanCho", "Edition 1 of the collector print", 260, ["art", "collector"]],
+    ["sarah_parish", "Worship on the steps before the doors opened", "worship-steps", ["worship", "healing", "love"]],
+    ["FredMack", "The founders canvas, half finished", "founders-canvas", ["art", "happenings"]],
+    ["DizzyDolly", "First look at the Charlotte collection", "first-look", ["art", "exhibitjoy"]],
+    ["JasonMackMiller", "Choir from the church on Tryon Street", "church-choir", ["worship", "choir"]],
+    ["MonicaBarkley", "Barbecue line, as long as the art line", "barbecue-line", ["happenings"]],
+    ["BryanCho", "Edition 1 of the collector print", "collector-print", ["art", "collector"]],
   ] as const;
-  const photos = await db.insert(s.photos).values(captions.map(([username, caption, hue, hashtags], i) => ({
+  const photos = await db.insert(s.photos).values(captions.map(([username, caption, file, hashtags], i) => ({
     eventId: event.id, userId: u[username].id, caption, hashtags: [...hashtags],
-    image: placeholder(`photo-${i + 1}`, caption.split(" ").slice(0, 3).join(" "), hue, 900, 1600),
+    image: `/examples/posts/${file}.jpg`,
     createdAt: new Date(Date.now() - (captions.length - i) * 7 * 60_000),
   }))).returning();
   await db.insert(s.photoLikes).values(photos.flatMap((p, i) => users.slice(0, 3 + (i % 5)).map((x) => ({ photoId: p.id, userId: x.id }))));
